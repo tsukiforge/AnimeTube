@@ -1,4 +1,4 @@
-import { formatDuration, formatViews, timeAgo, type YTVideo } from "@/lib/format";
+import { durationSeconds, formatDuration, formatViews, timeAgo, type YTVideo } from "@/lib/format";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 
@@ -48,13 +48,39 @@ function ChannelAvatar({ name, src }: { name: string; src?: string }) {
   );
 }
 
+function DurationBadge({ video }: { video: YTVideo }) {
+  const isLive = video.snippet?.liveBroadcastContent === "live";
+  const durSec = durationSeconds(video.contentDetails?.duration);
+  if (isLive) {
+    return (
+      <span className="absolute bottom-2 right-2 flex items-center gap-1 rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-bold uppercase text-white">
+        <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
+        Live
+      </span>
+    );
+  }
+  if (durSec > 0 && durSec < 60) {
+    return (
+      <span className="absolute bottom-2 right-2 rounded bg-black/90 px-1.5 py-0.5 text-[10px] font-bold text-white">
+        #Shorts
+      </span>
+    );
+  }
+  const duration = formatDuration(video.contentDetails?.duration);
+  if (!duration) return null;
+  return (
+    <span className="absolute bottom-2 right-2 rounded bg-black/90 px-1.5 py-0.5 text-xs font-medium text-white">
+      {duration}
+    </span>
+  );
+}
+
 export function VideoCard({ video, variant = "grid" }: { video: YTVideo; variant?: "grid" | "compact" }) {
   const id = typeof video.id === "string" ? video.id : (video as any).id?.videoId;
   const thumb =
     video.snippet.thumbnails?.maxres?.url ||
     video.snippet.thumbnails?.high?.url ||
     video.snippet.thumbnails?.medium?.url;
-  const duration = formatDuration(video.contentDetails?.duration);
   const channelName = video.snippet.channelTitle || "";
 
   if (variant === "compact") {
@@ -66,11 +92,7 @@ export function VideoCard({ video, variant = "grid" }: { video: YTVideo; variant
       >
         <div className="relative w-[168px] shrink-0 overflow-hidden rounded-lg bg-[#272727]" style={{ aspectRatio: "16/9" }}>
           {thumb && <Thumb src={thumb} alt={video.snippet.title} />}
-          {duration && (
-            <span className="absolute bottom-1 right-1 rounded bg-black/90 px-1 py-px text-[10px] font-medium text-white">
-              {duration}
-            </span>
-          )}
+          <DurationBadge video={video} />
         </div>
         <div className="min-w-0 flex-1">
           <h3 className="line-clamp-2 text-xs font-medium text-foreground leading-snug">
@@ -93,11 +115,7 @@ export function VideoCard({ video, variant = "grid" }: { video: YTVideo; variant
         style={{ aspectRatio: "16/9" }}
       >
         {thumb && <Thumb src={thumb} alt={video.snippet.title} />}
-        {duration && (
-          <span className="absolute bottom-2 right-2 rounded bg-black/90 px-1.5 py-0.5 text-xs font-medium text-white">
-            {duration}
-          </span>
-        )}
+        <DurationBadge video={video} />
       </div>
 
       {/* Info row — YouTube style */}

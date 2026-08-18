@@ -1,0 +1,127 @@
+name: Build Mobile App (Capacitor)
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+concurrency:
+  group: mobile-build-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # URL deploy Vercel — set sebagai GitHub Repository Variable "VITE_API_BASE"
+  # (Settings → Secrets and variables → Actions → Variables).
+  VITE_API_BASE: ${{ vars.VITE_API_BASE || 'https://animetube.vercel.app' }}
+  KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+  KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+  KEYSTORE_ALIAS: ${{ secrets.KEYSTORE_ALIAS }}
+  KEYSTORE_ALIAS_PASSWORD: ${{ secrets.KEYSTORE_ALIAS_PASSWORD }}
+
+jobs:
+  android:
+    name: Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web app (VITE_API_BASE di-bake ke bundle)
+        run: npm run build
+
+      - name: Add Capacitor Android platform
+        run: |
+          [ -d android ] || npx cap add android
+          npx cap sync android
+
+      - name: Build debug APK
+        working-directory: android
+        run: ./gradlew assembleDebug
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: animetube-debug.apk
+          path: android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+      - name: Configure release signing (keystore secrets)
+        if: ${{ env.KEYSTORE_BASE64 != '' }}
+        run: node scripts/apply-release-signing.mjs
+
+      - name: Build signed release APK + AAB
+        if: ${{ env.KEYSTORE_BASE64 != '' }}
+        working-directory: android
+        run: ./gradlew assembleRelease bundleRelease
+
+      - name: Upload signed release APK + AAB
+        if: ${{ env.KEYSTORE_BASE64 != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: animetube-release
+          path: |
+            android/app/build/outputs/apk/release/*.apk
+            android/app/build/outputs/bundle/release/*.aab
+          if-no-files-found: error
+
+  ios:
+    name: iOS (unsigned, simulator)
+    runs-on: macos-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web app (VITE_API_BASE di-bake ke bundle)
+        run: npm run build
+
+      - name: Add Capacitor iOS platform
+        run: |
+          [ -d ios ] || npx cap add ios
+          npx cap sync ios
+
+      - name: Build unsigned .app (simulator)
+        working-directory: ios/App
+        run: |
+          xcodebuild \
+            -project App.xcodeproj \
+            -scheme App \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Zip .app
+        working-directory: ios/App/build/Build/Products/Debug-iphonesimulator
+        run: zip -r App-simulator.app.zip App.app
+
+      - name: Upload iOS app
+        uses: actions/upload-artifact@v4
+        with:
+          name: animetube-ios-simulator
+          path: ios/App/build/Build/Products/Debug-iphonesimulator/App-simulator.app.zip
+          if-no-files-found: error

@@ -5,7 +5,7 @@ import { Sidebar } from "@/components/Sidebar";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import { VideoCard } from "@/components/VideoCard";
 import { useWatchHistory } from "@/hooks/use-watch-history";
-import { searchVideos, trendingAnime } from "@/lib/youtube.functions";
+import { mixedFeed } from "@/lib/youtube.functions";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
@@ -60,14 +60,10 @@ function ContinueWatching() {
 }
 
 function VideoFeed({ activeChip }: { activeChip: typeof CHIPS[0] }) {
-  const isTrending = activeChip.label === "Semua" || activeChip.label === "Trending";
-
   const infiniteResult = useInfiniteQuery({
     queryKey: ["home-feed", activeChip.q],
     queryFn: ({ pageParam }) =>
-      isTrending
-        ? trendingAnime({ maxResults: 20, q: activeChip.q, pageToken: pageParam as string | undefined })
-        : searchVideos({ q: activeChip.q, order: "viewCount", maxResults: 24, pageToken: pageParam as string | undefined }),
+      mixedFeed({ q: activeChip.q, maxResults: 24, pageToken: pageParam as string | undefined }),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (last: any) => last.nextPageToken ?? undefined,
     staleTime: 10 * 60 * 1000,

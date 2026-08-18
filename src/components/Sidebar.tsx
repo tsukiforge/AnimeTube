@@ -1,15 +1,12 @@
-import { useRegion } from "@/hooks/use-region";
 import { useSidebar } from "@/hooks/use-sidebar";
 import { useWatchHistory } from "@/hooks/use-watch-history";
 import { GENRES } from "@/lib/constants";
 import { Link } from "@tanstack/react-router";
 import {
-    AlertTriangle, Coffee, Compass, Globe,
+    Coffee, Compass,
     HelpCircle, Home, Info, Lock,
     Radio, Settings, TrendingUp, Tv2, X,
 } from "lucide-react";
-import { useState } from "react";
-import { createPortal } from "react-dom";
 
 const MAIN = [
   { to: "/",                label: "Beranda",  Icon: Home      },
@@ -25,91 +22,6 @@ const META = [
   { to: "/about",    label: "Bantuan",    Icon: HelpCircle, hash: "help"    },
   { to: "/about",    label: "Privasi",    Icon: Lock,       hash: "privacy" },
 ] as const;
-
-// ── Region Selector ──────────────────────────────────────────────
-function RegionSelector({ onClose }: { onClose?: () => void }) {
-  const { region, setRegion, regions } = useRegion();
-  const [pending, setPending] = useState<string | null>(null);
-  const pendingRegion = regions.find((r) => r.code === pending);
-
-  const handleSelect = (code: string) => {
-    const r = regions.find((x) => x.code === code);
-    if (!r) return;
-    if (r.warning) { setPending(code); return; }
-    setRegion(code);
-    onClose?.();
-  };
-
-  const confirmChange = () => {
-    if (pending) { setRegion(pending); setPending(null); onClose?.(); }
-  };
-
-  return (
-    <>
-      <div className="px-3 pb-1">
-        <div className="flex items-center gap-1.5 mb-2">
-          <Globe size={12} className="text-muted-foreground" />
-          <p className="section-label">Region</p>
-        </div>
-        <div className="grid grid-cols-2 gap-1">
-          {regions.map((r) => (
-            <button
-              key={r.code}
-              onClick={() => handleSelect(r.code)}
-              className={`flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs transition-colors text-left ${
-                region === r.code
-                  ? "bg-primary/15 text-primary font-semibold"
-                  : "text-muted-foreground hover:bg-surface hover:text-foreground"
-              }`}
-            >
-              <span className="text-sm">{r.flag}</span>
-              <span className="truncate">{r.label}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Warning dialog — pakai Portal agar tidak tertutup overflow sidebar */}
-      {pending && pendingRegion?.warning && createPortal(
-        <div
-          className="fixed inset-0 flex items-center justify-center p-4"
-          style={{ zIndex: 999999, background: "rgba(0,0,0,0.75)" }}
-        >
-          <div className="w-full max-w-sm rounded-xl border border-border bg-background p-5 shadow-2xl">
-            <div className="flex items-start gap-3 mb-3">
-              <AlertTriangle size={20} className="text-yellow-500 shrink-0 mt-0.5" />
-              <div>
-                <p className="font-semibold text-sm text-foreground mb-1">
-                  Pindah ke region {pendingRegion.flag} {pendingRegion.label}?
-                </p>
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  {pendingRegion.warning}
-                </p>
-              </div>
-            </div>
-            <div className="flex gap-2 mt-4">
-              <button
-                onClick={() => setPending(null)}
-                className="flex-1 rounded-lg border border-border px-3 py-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Batal
-              </button>
-              <button
-                onClick={confirmChange}
-                className="flex-1 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground hover:opacity-90 transition-opacity"
-              >
-                Saya Mengerti, Lanjutkan
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-    </>
-  );
-}
-
-// ── Support Banner ────────────────────────────────────────────────
 
 // ── Support Banner ────────────────────────────────────────────────
 function SupportBanner() {
@@ -158,11 +70,6 @@ function NavList({ onItemClick }: { onItemClick?: () => void }) {
           </Link>
         ))}
       </div>
-
-      <div className="my-2 h-px bg-border mx-3" />
-
-      {/* Region */}
-      <RegionSelector onClose={onItemClick} />
 
       <div className="my-2 h-px bg-border mx-3" />
 

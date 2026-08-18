@@ -17,6 +17,14 @@ export function formatDuration(iso: string | undefined): string {
   return h > 0 ? `${h}:${pad(mn)}:${pad(s)}` : `${mn}:${pad(s)}`;
 }
 
+/** Parse ISO 8601 duration to total seconds */
+export function durationSeconds(iso: string | undefined): number {
+  if (!iso) return 0;
+  const m = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+  if (!m) return 0;
+  return parseInt(m[1] || "0", 10) * 3600 + parseInt(m[2] || "0", 10) * 60 + parseInt(m[3] || "0", 10);
+}
+
 export function timeAgo(iso: string | undefined): string {
   if (!iso) return "";
   const diff = Date.now() - new Date(iso).getTime();
@@ -40,6 +48,7 @@ export type YTVideo = {
     channelTitle: string;
     channelId: string;
     publishedAt: string;
+    liveBroadcastContent?: "none" | "live" | "upcoming";
     thumbnails: { medium?: { url: string }; high?: { url: string }; maxres?: { url: string } };
     description?: string;
     tags?: string[];

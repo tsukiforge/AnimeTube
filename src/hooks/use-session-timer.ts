@@ -13,8 +13,7 @@ import { toast } from "sonner";
 
 const THRESHOLD_SECS = 5 * 60 * 60; // 5 hours
 
-const SAWERIA_URL  = "https://saweria.co/MahiroDev";
-const SOZIBUZZ_URL = "https://sozibuzz.com/MahiroDev";
+const Tako = "https://tako.id/c/SiMahiro";
 
 // In-memory counter — shared across hook instances but only one instance runs (root)
 let sessionSeconds = 0;
@@ -27,12 +26,8 @@ function fireSupportToast() {
     duration: 15000,
     action: {
       label: "🌸 Saweria",
-      onClick: () => window.open(SAWERIA_URL, "_blank", "noopener,noreferrer"),
-    },
-    cancel: {
-      label: "💛 Sozibuzz",
-      onClick: () => window.open(SOZIBUZZ_URL, "_blank", "noopener,noreferrer"),
-    },
+      onClick: () => window.open(Tako, "_blank", "noopener,noreferrer"),
+    }
   });
 }
 

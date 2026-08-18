@@ -1,8 +1,14 @@
 import { getRegion, REGIONS } from "@/hooks/use-region";
 import { processYouTubeResponse } from "./content-filter";
+import { durationSeconds } from "./format";
 
 // Proxy endpoint — API key disimpan di server Vercel, tidak exposed ke browser
-const PROXY = "/api/youtube";
+// Di app native (Capacitor) pakai VITE_API_BASE (URL deploy Vercel), karena
+// relative path "/api/youtube" tidak tersedia di WebView.
+const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined)?.replace(/\/+$/, "");
+const PROXY = API_BASE ? `${API_BASE}/api/youtube` : "/api/youtube";
+// Di development (vite dev server) proxy serverless tidak ada, jadi call YouTube langsung
+const DEV_KEY = import.meta.env.VITE_YOUTUBE_API_KEY as string | undefined;
 
 // YouTube relevanceLanguage hanya support subset BCP-47
 // https://developers.google.com/youtube/v3/docs/search/list#relevanceLanguage
@@ -20,6 +26,20 @@ function getRegionParams() {
 }
 
 async function yt(path: string, params: Record<string, string | number | undefined>) {
+  if (import.meta.env.DEV && DEV_KEY) {
+    const url = new URL(`https://www.googleapis.com/youtube/v3/${path}`);
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== "") url.searchParams.set(k, String(v));
+    });
+    url.searchParams.set("safeSearch", "strict");
+    url.searchParams.set("key", DEV_KEY);
+    const res = await fetch(url.toString());
+    if (!res.ok) {
+      throw new Error(`YouTube API ${res.status}: ${(await res.text().catch(() => "")).slice(0, 200)}`);
+    }
+    return res.json();
+  }
+
   const url = new URL(PROXY, window.location.origin);
   url.searchParams.set("path", path);
   Object.entries(params).forEach(([k, v]) => {
@@ -42,10 +62,7 @@ async function yt(path: string, params: Record<string, string | number | undefin
 
 /** Parse ISO 8601 duration to total seconds */
 function parseDurationSec(iso: string | undefined): number {
-  if (!iso) return 0;
-  const m = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
-  if (!m) return 0;
-  return parseInt(m[1] || "0") * 3600 + parseInt(m[2] || "0") * 60 + parseInt(m[3] || "0");
+  return durationSeconds(iso);
 }
 
 function smartRank(items: any[]): any[] {
@@ -58,11 +75,14 @@ function smartRank(items: any[]): any[] {
       const durSec = parseDurationSec(v.contentDetails?.duration);
       const ageDays = (now - new Date(v.snippet?.publishedAt || 0).getTime()) / 86400000;
       const engagementRate = views > 0 ? (likes / views) * 1000 : 0;
+      // YouTube-like: medium & long videos di-boost, shorts tetap ada tapi tidak mendominasi
       let durScore = 1;
-      if (durSec < 30) durScore = 0.1;
-      else if (durSec < 60) durScore = 0.5;
-      else if (durSec >= 240 && durSec <= 1500) durScore = 1.4;
-      else if (durSec > 3600) durScore = 0.8;
+      if (durSec < 60) durScore = 0.35;
+      else if (durSec < 240) durScore = 0.8;
+      else if (durSec < 600) durScore = 1.4;
+      else if (durSec <= 2400) durScore = 1.7;
+      else if (durSec <= 5400) durScore = 1.5;
+      else if (durSec > 9000) durScore = 0.9;
       const recencyScore = ageDays <= 7 ? 1.5 : ageDays <= 30 ? 1.2 : 1;
       const commentBoost = comments > 100 ? 1.2 : comments > 10 ? 1.1 : 1;
       const score = Math.log10(views + 1) * durScore * recencyScore * commentBoost * (1 + engagementRate * 0.1);
@@ -70,6 +90,61 @@ function smartRank(items: any[]): any[] {
     })
     .sort((a, b) => b._score - a._score)
     .map(({ _score: _, ...v }) => v);
+}
+
+/**
+ * Weighted round-robin — gabungkan beberapa group video jadi satu feed
+ * ala YouTube (short / medium / long / live tercampur natural).
+ */
+function interleaveFeed(groups: { items: any[]; weight: number }[]): any[] {
+  const out: any[] = [];
+  const seen = new Set<string>();
+  const idxs = groups.map(() => 0);
+  const maxIters = groups.reduce((s, g) => s + g.items.length, 0) * 3 + 10;
+  for (let i = 0; i < maxIters; i++) {
+    let best = -1;
+    let bestScore = -Infinity;
+    groups.forEach((g, gi) => {
+      if (idxs[gi] >= g.items.length) return;
+      const rel = (g.items.length - idxs[gi]) / g.weight;
+      if (rel > bestScore) { bestScore = rel; best = gi; }
+    });
+    if (best < 0) break;
+    const item = groups[best].items[idxs[best]++];
+    const id = item?.id;
+    if (id && !seen.has(id)) {
+      seen.add(id);
+      out.push(item);
+    }
+  }
+  return out;
+}
+
+/**
+ * Home feed ala YouTube — campuran video pendek, panjang, dan live.
+ * Halaman pertama diambil dari 4 bucket (short/medium/long/live) lalu
+ * digabung; halaman berikutnya pakai pencarian normal (hemat quota).
+ */
+export async function mixedFeed(params: { q?: string; maxResults?: number; pageToken?: string } = {}) {
+  const { q = "anime", maxResults = 24, pageToken } = params;
+  if (!pageToken) {
+    const [short, medium, long, live] = await Promise.all([
+      searchVideos({ q, videoDuration: "short", maxResults: 8, order: "viewCount" }),
+      searchVideos({ q, videoDuration: "medium", maxResults: 10, order: "viewCount" }),
+      searchVideos({ q, videoDuration: "long", maxResults: 8, order: "viewCount" }),
+      searchVideos({ q, eventType: "live", maxResults: 4, order: "viewCount" }),
+    ]);
+    return {
+      items: interleaveFeed([
+        { items: short.items, weight: 1.2 },
+        { items: medium.items, weight: 2 },
+        { items: long.items, weight: 1.5 },
+        { items: live.items, weight: 1 },
+      ]),
+      nextPageToken: medium.nextPageToken || long.nextPageToken || short.nextPageToken,
+    };
+  }
+  return searchVideos({ q, order: "viewCount", maxResults, pageToken });
 }
 
 export type SearchParams = {

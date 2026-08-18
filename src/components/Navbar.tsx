@@ -3,7 +3,7 @@ import { useTheme } from "@/hooks/use-theme";
 import { topKeywords, trackSearch, useRecentSearches } from "@/hooks/use-watch-history";
 import { GENRES } from "@/lib/constants";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Menu, Mic, Moon, Search, Settings, Sun } from "lucide-react";
+import { Menu, Mic, Moon, Search, Settings, Sun, X as XIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 const POPULAR = [
