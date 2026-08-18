@@ -50,34 +50,34 @@ jobs:
           [ -d android ] || npx cap add android
           npx cap sync android
 
-      - name: Build debug APK
-        working-directory: android
-        run: ./gradlew assembleDebug
-
-      - name: Upload debug APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: animetube-debug.apk
-          path: android/app/build/outputs/apk/debug/*.apk
-          if-no-files-found: error
-
       - name: Configure release signing (keystore secrets)
         if: ${{ env.KEYSTORE_BASE64 != '' }}
         run: node scripts/apply-release-signing.mjs
 
       - name: Build signed release APK + AAB
-        if: ${{ env.KEYSTORE_BASE64 != '' }}
         working-directory: android
         run: ./gradlew assembleRelease bundleRelease
 
-      - name: Upload signed release APK + AAB
-        if: ${{ env.KEYSTORE_BASE64 != '' }}
+      - name: Rename release APK → animetube.apk
+        working-directory: android/app/build/outputs/apk/release
+        run: mv app-release.apk animetube.apk
+
+      - name: Upload release APK (animetube.apk)
         uses: actions/upload-artifact@v4
         with:
-          name: animetube-release
-          path: |
-            android/app/build/outputs/apk/release/*.apk
-            android/app/build/outputs/bundle/release/*.aab
+          name: animetube.apk
+          path: android/app/build/outputs/apk/release/animetube.apk
+          if-no-files-found: error
+
+      - name: Rename release AAB → animetube-release.aab
+        working-directory: android/app/build/outputs/bundle/release
+        run: mv app-release.aab animetube-release.aab
+
+      - name: Upload release AAB (Play Store)
+        uses: actions/upload-artifact@v4
+        with:
+          name: animetube-release.aab
+          path: android/app/build/outputs/bundle/release/animetube-release.aab
           if-no-files-found: error
 
   ios:
@@ -115,13 +115,65 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             build
 
-      - name: Zip .app
+      - name: Zip .app → animetube-ios.app.zip
         working-directory: ios/App/build/Build/Products/Debug-iphonesimulator
-        run: zip -r App-simulator.app.zip App.app
+        run: zip -r animetube-ios.app.zip App.app
 
       - name: Upload iOS app
         uses: actions/upload-artifact@v4
         with:
-          name: animetube-ios-simulator
-          path: ios/App/build/Build/Products/Debug-iphonesimulator/App-simulator.app.zip
+          name: animetube-ios
+          path: ios/App/build/Build/Products/Debug-iphonesimulator/animetube-ios.app.zip
           if-no-files-found: error
+
+  release:
+    name: GitHub Release + Changelog
+    needs: [android, ios]
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Determine release tag
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          TAG="v${VERSION}"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            TAG="v${VERSION}-build-$(date +%Y%m%d-%H%M)"
+          fi
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+
+      - name: Generate changelog (commit sejak tag terakhir)
+        run: |
+          PREV=$(git describe --tags --abbrev=0 2>/dev/null || true)
+          RANGE=""
+          if [ -n "$PREV" ] && [ "$(git rev-list --count "$PREV..HEAD" 2>/dev/null || echo 0)" -gt 0 ]; then
+            RANGE="$PREV..HEAD"
+          fi
+          if [ -z "$RANGE" ]; then
+            RANGE="HEAD~15..HEAD"
+          fi
+          {
+            echo "## Yang Baru di v$(node -p "require('./package.json').version")"
+            echo ""
+            git log --oneline --no-merges "$RANGE" | sed 's/^/- /'
+          } > changelog.md
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$TAG" \
+            --title "AnimeTube $TAG" \
+            --notes "$(cat changelog.md)" \
+            release-assets/*
