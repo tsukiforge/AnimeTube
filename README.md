@@ -41,7 +41,7 @@ AnimeTube bisa dijalankan sebagai aplikasi Android & iOS berkat [Capacitor](http
   - `animetube-release.aab` — bundle Android untuk Play Store
   - `animetube-ios.app.zip` — aplikasi iOS (unsigned, untuk simulator)
 - **GitHub Release** — semua artifact di-upload otomatis ke Release berserta changelog dari commit terbaru.
-- **API endpoint** — aplikasi mobile memakai `VITE_API_BASE` (default `https://animetube.vercel.app`) sebagai backend proxy; tidak perlu key YouTube di perangkat.
+- **API endpoint** — aplikasi mobile memakai `VITE_API_BASE` (default `https://animtubev1.vercel.app`) sebagai backend proxy; tidak perlu key YouTube di perangkat.
 
 ### Cara build manual (opsional)
 

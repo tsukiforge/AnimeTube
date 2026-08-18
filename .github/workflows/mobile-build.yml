@@ -14,7 +14,7 @@ concurrency:
 env:
   # URL deploy Vercel — set sebagai GitHub Repository Variable "VITE_API_BASE"
   # (Settings → Secrets and variables → Actions → Variables).
-  VITE_API_BASE: ${{ vars.VITE_API_BASE || 'https://animetube.vercel.app' }}
+  VITE_API_BASE: ${{ vars.VITE_API_BASE || 'https://animtubev1.vercel.app' }}
   KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
   KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
   KEYSTORE_ALIAS: ${{ secrets.KEYSTORE_ALIAS }}
@@ -142,42 +142,58 @@ jobs:
         with:
           fetch-depth: 0
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
       - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
           path: release-assets
           merge-multiple: true
 
-      - name: Determine release tag
+      - name: Determine release tag & create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           VERSION=$(node -p "require('./package.json').version")
           TAG="v${VERSION}"
+          
+          # Check if tag already exists
           if git rev-parse "$TAG" >/dev/null 2>&1; then
-            TAG="v${VERSION}-build-$(date +%Y%m%d-%H%M)"
+            echo "Tag $TAG already exists, skipping release creation"
+            exit 0
           fi
-          echo "TAG=$TAG" >> "$GITHUB_ENV"
-
-      - name: Generate changelog (commit sejak tag terakhir)
-        run: |
+          
+          # Generate changelog dari commits
           PREV=$(git describe --tags --abbrev=0 2>/dev/null || true)
           RANGE=""
           if [ -n "$PREV" ] && [ "$(git rev-list --count "$PREV..HEAD" 2>/dev/null || echo 0)" -gt 0 ]; then
             RANGE="$PREV..HEAD"
+          else
+            RANGE="HEAD~20..HEAD"
           fi
-          if [ -z "$RANGE" ]; then
-            RANGE="HEAD~15..HEAD"
-          fi
+          
           {
-            echo "## Yang Baru di v$(node -p "require('./package.json').version")"
+            echo "# AnimeTube v${VERSION}"
             echo ""
-            git log --oneline --no-merges "$RANGE" | sed 's/^/- /'
-          } > changelog.md
-
-      - name: Create GitHub Release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
+            echo "## 📥 Downloads"
+            echo "- **APK (Android)**: Download from release assets or install directly"
+            echo "- **iOS**: Available for simulator testing"
+            echo ""
+            echo "## 📝 Changelog"
+            echo ""
+            git log --oneline --no-merges "$RANGE" 2>/dev/null | sed 's/^/- /' || echo "- Initial release"
+            echo ""
+            echo "## 🚀 Installation"
+            echo "**Android**: Download \`animetube.apk\` and install on your device"
+            echo "**Web**: Visit https://animtubev1.vercel.app"
+          } > RELEASE_NOTES.md
+          
+          # Create release with proper versioning
           gh release create "$TAG" \
-            --title "AnimeTube $TAG" \
-            --notes "$(cat changelog.md)" \
+            --title "AnimeTube v${VERSION}" \
+            --notes-file RELEASE_NOTES.md \
             release-assets/*
+          
+          echo "Release v${VERSION} created successfully"

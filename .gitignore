@@ -41,3 +41,7 @@ SETUP.md
 
 # Backup base64 keystore lokal (jangan di-commit)
 *.b64
+
+# Capacitor platform (di-generate otomatis oleh CI)
+android/
+ios/

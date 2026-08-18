@@ -3,6 +3,10 @@ import { TanStackRouterVite } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 import tsConfigPaths from "vite-tsconfig-paths";
+import fs from "fs";
+import path from "path";
+
+const pkg = JSON.parse(fs.readFileSync(path.resolve(__dirname, "package.json"), "utf-8"));
 
 export default defineConfig({
   plugins: [
@@ -15,6 +19,9 @@ export default defineConfig({
     react(),
   ],
   envPrefix: "VITE_",
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version),
+  },
   resolve: {
     alias: { "@": "/src" },
     dedupe: [

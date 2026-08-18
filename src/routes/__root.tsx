@@ -1,6 +1,7 @@
 import { AdblockDetector } from "@/components/AdblockDetector";
 import { DisclaimerModal } from "@/components/DisclaimerModal";
 import { OfflineScreen } from "@/components/OfflineScreen";
+import { UpdateChecker } from "@/components/UpdateChecker";
 import { Toaster } from "@/components/ui/sonner";
 import { useSessionTimer } from "@/hooks/use-session-timer";
 import { QueryClient } from "@tanstack/react-query";
@@ -55,6 +56,7 @@ function RootComponent() {
       <OfflineScreen />
       <AdblockDetector />
       <DisclaimerModal />
+      <UpdateChecker />
       <Toaster position="bottom-right" richColors closeButton />
       <Outlet />
     </>
