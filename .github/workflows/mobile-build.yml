@@ -60,7 +60,9 @@ jobs:
 
       - name: Rename release APK → animetube.apk
         working-directory: android/app/build/outputs/apk/release
-        run: mv app-release.apk animetube.apk
+        run: |
+          APK=$(ls app-release*.apk | head -1)
+          mv "$APK" animetube.apk
 
       - name: Upload release APK (animetube.apk)
         uses: actions/upload-artifact@v4
@@ -71,7 +73,9 @@ jobs:
 
       - name: Rename release AAB → animetube-release.aab
         working-directory: android/app/build/outputs/bundle/release
-        run: mv app-release.aab animetube-release.aab
+        run: |
+          AAB=$(ls app-release*.aab | head -1)
+          mv "$AAB" animetube-release.aab
 
       - name: Upload release AAB (Play Store)
         uses: actions/upload-artifact@v4
