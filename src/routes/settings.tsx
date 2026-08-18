@@ -2,6 +2,7 @@ import { Navbar } from "@/components/Navbar";
 import { Sidebar } from "@/components/Sidebar";
 import { REGIONS, useRegion } from "@/hooks/use-region";
 import { useTheme } from "@/hooks/use-theme";
+import { useSeo } from "@/lib/seo";
 import { createFileRoute } from "@tanstack/react-router";
 import { AlertTriangle, CheckCircle, Globe, Moon, Palette, Shield, Sun, Tv2 } from "lucide-react";
 import { useState } from "react";
@@ -9,6 +10,11 @@ import { useState } from "react";
 export const Route = createFileRoute("/settings")({ component: SettingsPage });
 
 function SettingsPage() {
+  useSeo({
+    title: "Pengaturan",
+    description: "Atur preferensi AnimeTube — tema, region konten, dan pengaturan keamanan family-friendly.",
+    path: "/settings",
+  });
   const { region, setRegion, regions } = useRegion();
   const { theme, toggle } = useTheme();
   const [pending, setPending] = useState<string | null>(null);

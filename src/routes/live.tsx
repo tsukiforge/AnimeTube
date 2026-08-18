@@ -4,12 +4,18 @@ import { Sidebar } from "@/components/Sidebar";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import { VideoCard } from "@/components/VideoCard";
 import { searchVideos } from "@/lib/youtube.functions";
+import { useSeo } from "@/lib/seo";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/live")({ component: LivePage });
 
 function LivePage() {
+  useSeo({
+    title: "Anime Live Stream & Premier",
+    description: "Nonton live stream anime 24/7 dan jadwal premier terbaru. Siaran langsung anime gratis tanpa login.",
+    path: "/live",
+  });
   const { data, isLoading } = useQuery({
     queryKey: ["live"],
     queryFn: () => searchVideos({ q: "anime live 24/7", eventType: "live", order: "viewCount", maxResults: 24 }),

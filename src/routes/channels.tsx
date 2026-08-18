@@ -2,6 +2,7 @@ import { Navbar } from "@/components/Navbar";
 import { Sidebar } from "@/components/Sidebar";
 import { formatViews } from "@/lib/format";
 import { getAnimeChannels } from "@/lib/youtube.functions";
+import { useSeo } from "@/lib/seo";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ExternalLink, RefreshCw, Tv2 } from "lucide-react";
@@ -80,6 +81,11 @@ function ChannelCard({ ch }: { ch: any }) {
 }
 
 function ChannelsPage() {
+  useSeo({
+    title: "Channel Anime Populer",
+    description: "Daftar channel anime populer — Crunchyroll, Muse Asia, Ani-One, dan lainnya. Nonton anime gratis tanpa login.",
+    path: "/channels",
+  });
   const { data, isLoading, refetch, isFetching } = useQuery({
     queryKey: ["anime-channels-page"],
     queryFn: getAnimeChannels,

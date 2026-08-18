@@ -35,7 +35,7 @@ function SupportBanner() {
         Gratis, no login, bebas judol. Bantu kami tetap online.
       </p>
       <a
-        href="https://sociabuzz.com/zuax"
+        href="https://tako.id/c/SiMahiro"
         target="_blank"
         rel="noopener noreferrer"
         className="block w-full text-center rounded-md bg-primary px-3 py-1.5 text-[11px] font-semibold text-primary-foreground hover:opacity-90 transition-opacity"

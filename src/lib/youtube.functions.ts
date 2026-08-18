@@ -147,6 +147,32 @@ export async function mixedFeed(params: { q?: string; maxResults?: number; pageT
   return searchVideos({ q, order: "viewCount", maxResults, pageToken });
 }
 
+/**
+ * Ambil foto channel secara batch (1 call channels API, 1 unit) lalu
+ * tempelkan sebagai `_channelAvatar` ke tiap video.
+ */
+async function attachChannelAvatars(items: any[]): Promise<any[]> {
+  const ids = [...new Set(items.map((v: any) => v.snippet?.channelId).filter(Boolean))].slice(0, 50);
+  if (!ids.length) return items;
+  try {
+    const json = await yt("channels", { part: "snippet", id: ids.join(","), maxResults: 50 });
+    const map = new Map<string, string>();
+    for (const ch of json.items || []) {
+      const t = ch.snippet?.thumbnails;
+      const url = t?.medium?.url || t?.default?.url || t?.high?.url;
+      if (url) map.set(ch.id, url);
+    }
+    if (!map.size) return items;
+    return items.map((v) =>
+      map.has(v.snippet?.channelId)
+        ? { ...v, _channelAvatar: map.get(v.snippet?.channelId) }
+        : v
+    );
+  } catch {
+    return items;
+  }
+}
+
 export type SearchParams = {
   q?: string;
   maxResults?: number;
@@ -174,7 +200,7 @@ export async function searchVideos(params: SearchParams = {}) {
     details = await yt("videos", { part: "snippet,statistics,contentDetails", id: ids });
   }
   const ranked = smartRank(processYouTubeResponse(details.items || []));
-  return { items: ranked, nextPageToken: json.nextPageToken as string | undefined };
+  return { items: await attachChannelAvatars(ranked), nextPageToken: json.nextPageToken as string | undefined };
 }
 
 export async function trendingAnime(params: { maxResults?: number; q?: string; pageToken?: string } = {}) {
@@ -189,13 +215,14 @@ export async function trendingAnime(params: { maxResults?: number; q?: string; p
   if (!ids) return { items: [], nextPageToken: undefined };
   const details = await yt("videos", { part: "snippet,statistics,contentDetails", id: ids });
   const ranked = smartRank(processYouTubeResponse(details.items || []));
-  return { items: ranked, nextPageToken: json.nextPageToken as string | undefined };
+  return { items: await attachChannelAvatars(ranked), nextPageToken: json.nextPageToken as string | undefined };
 }
 
 export async function getVideo(id: string) {
   const json = await yt("videos", { part: "snippet,statistics,contentDetails", id });
   const filtered = processYouTubeResponse(json.items || []);
-  return { item: filtered[0] || null };
+  const [first] = await attachChannelAvatars(filtered);
+  return { item: first || null };
 }
 
 export async function getComments(videoId: string) {
@@ -220,7 +247,7 @@ export async function getRelated(q: string, excludeId?: string) {
     .join(",");
   if (!ids) return { items: [] };
   const details = await yt("videos", { part: "snippet,statistics,contentDetails", id: ids });
-  return { items: processYouTubeResponse(details.items || []) };
+  return { items: await attachChannelAvatars(processYouTubeResponse(details.items || [])) };
 }
 
 export async function getChannel(id: string) {

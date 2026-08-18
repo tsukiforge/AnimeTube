@@ -43,6 +43,7 @@ export function timeAgo(iso: string | undefined): string {
 
 export type YTVideo = {
   id: string;
+  _channelAvatar?: string;
   snippet: {
     title: string;
     channelTitle: string;

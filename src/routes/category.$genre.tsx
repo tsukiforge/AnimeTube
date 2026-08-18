@@ -6,6 +6,7 @@ import { SkeletonCard } from "@/components/SkeletonCard";
 import { VideoCard } from "@/components/VideoCard";
 import { GENRES } from "@/lib/constants";
 import { searchVideos } from "@/lib/youtube.functions";
+import { useSeo } from "@/lib/seo";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 
@@ -15,6 +16,12 @@ function CategoryPage() {
   const { genre } = Route.useParams();
   const meta = GENRES.find((g) => g.slug === genre) || { slug: genre, label: genre, icon: "🎴" };
   const q = `${meta.label} anime`;
+
+  useSeo({
+    title: `Anime ${meta.label} — Koleksi Video Terbaik`,
+    description: `Nonton koleksi video anime genre ${meta.label.toLowerCase()} terbaik dan terlengkap. Trending, populer, dan terbaru — gratis tanpa login.`,
+    path: `/category/${meta.slug}`,
+  });
 
   const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
     queryKey: ["category-infinite", q],

@@ -5,6 +5,7 @@ import { SkeletonCard } from "@/components/SkeletonCard";
 import { VideoCard } from "@/components/VideoCard";
 import { formatViews } from "@/lib/format";
 import { getChannel, searchVideos } from "@/lib/youtube.functions";
+import { useSeo } from "@/lib/seo";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
@@ -31,6 +32,13 @@ function ChannelPage() {
   const ch = chData?.channel;
   const banner = ch?.brandingSettings?.image?.bannerExternalUrl;
   const avatar = ch?.snippet?.thumbnails?.high?.url || ch?.snippet?.thumbnails?.default?.url;
+
+  useSeo({
+    title: ch?.snippet?.title ? `Channel ${ch.snippet.title}` : "Channel Anime",
+    description: ch?.snippet?.description?.replace(/\s+/g, " ").slice(0, 160),
+    path: `/channel/${channelId}`,
+    image: avatar,
+  });
 
   return (
     <div className="min-h-screen bg-background">

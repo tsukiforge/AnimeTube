@@ -6,6 +6,7 @@ import { SkeletonCard } from "@/components/SkeletonCard";
 import { VideoCard } from "@/components/VideoCard";
 import { useWatchHistory } from "@/hooks/use-watch-history";
 import { mixedFeed } from "@/lib/youtube.functions";
+import { useSeo } from "@/lib/seo";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
@@ -91,6 +92,15 @@ function VideoFeed({ activeChip }: { activeChip: typeof CHIPS[0] }) {
 
 function HomePage() {
   const [activeChip, setActiveChip] = useState(CHIPS[0]);
+
+  useSeo({
+    title: activeChip.label === "Semua" ? "Nonton Anime Gratis Tanpa Login" : `Anime ${activeChip.label} — Koleksi Terbaru`,
+    description:
+      activeChip.label === "Semua"
+        ? "Nonton video anime gratis tanpa login. Trending, Shorts, Live, dan ratusan genre anime lainnya. Diperbarui setiap hari."
+        : `Kumpulan video anime genre ${activeChip.label.toLowerCase()} terbaik — trending, populer, dan terbaru setiap hari.`,
+    path: "/",
+  });
 
   return (
     <div className="min-h-screen bg-background">

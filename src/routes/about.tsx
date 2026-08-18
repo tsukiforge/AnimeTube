@@ -2,17 +2,10 @@ import { AdSlot } from "@/components/AdSlot";
 import { Footer } from "@/components/Footer";
 import { Navbar } from "@/components/Navbar";
 import { Sidebar } from "@/components/Sidebar";
+import { useSeo } from "@/lib/seo";
 import { createFileRoute, Link } from "@tanstack/react-router";
 
-export const Route = createFileRoute("/about")({
-  head: () => ({
-    meta: [
-      { title: "About AnimeTube" },
-      { name: "description", content: "About AnimeTube — anime streaming experience powered by YouTube." },
-    ],
-  }),
-  component: AboutPage,
-});
+export const Route = createFileRoute("/about")({ component: AboutPage });
 
 function Section({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
   return (
@@ -24,6 +17,11 @@ function Section({ id, title, children }: { id: string; title: string; children:
 }
 
 function AboutPage() {
+  useSeo({
+    title: "Tentang AnimeTube",
+    description: "AnimeTube adalah platform agregator video anime gratis tanpa login. Transparan, aman, dan family-friendly — powered by YouTube Data API.",
+    path: "/about",
+  });
   return (
     <div className="min-h-screen bg-background">
       <Navbar />

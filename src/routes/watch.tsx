@@ -8,6 +8,7 @@ import { trackWatch } from "@/hooks/use-watch-history";
 import { formatWatchTime, useWatchTimer } from "@/hooks/use-watch-timer";
 import { formatViews, timeAgo } from "@/lib/format";
 import { getComments, getRelated, getVideo } from "@/lib/youtube.functions";
+import { useSeo } from "@/lib/seo";
 import { useQuery } from "@tanstack/react-query";
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
 import { fallback, zodValidator } from "@tanstack/zod-adapter";
@@ -164,6 +165,14 @@ function VideoMain({ autoNextId }: { autoNextId: string | null }) {
   });
   const video = data?.item;
   const [showFull, setShowFull] = useState(false);
+
+  useSeo({
+    title: video?.snippet.title,
+    description: video?.snippet.description?.replace(/\s+/g, " ").slice(0, 160),
+    path: `/watch?v=${v}`,
+    image: video?.snippet.thumbnails?.maxres?.url || video?.snippet.thumbnails?.high?.url,
+    type: "video.other",
+  });
   const [countdown, setCountdown] = useState<number | null>(null);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [showMini, setShowMini] = useState(false);
@@ -441,8 +450,17 @@ function VideoMain({ autoNextId }: { autoNextId: string | null }) {
       </p>
 
       <div className="anime-border mt-4 flex items-center gap-3 rounded-xl bg-card p-4">
+        {video._channelAvatar && (
+          <img
+            src={video._channelAvatar}
+            alt={video.snippet.channelTitle}
+            className="h-12 w-12 rounded-full object-cover ring-2 ring-border shrink-0"
+            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+          />
+        )}
         <Link to="/channel/$channelId" params={{ channelId: video.snippet.channelId }}
-          className="grid h-12 w-12 place-items-center rounded-full bg-primary/20 font-bold text-primary text-lg shrink-0">
+          className="grid h-12 w-12 place-items-center rounded-full bg-primary/20 font-bold text-primary text-lg shrink-0"
+          style={{ display: video._channelAvatar ? "none" : "grid" }}>
           {video.snippet.channelTitle?.[0] || "?"}
         </Link>
         <div className="flex-1">
@@ -509,7 +527,13 @@ function Comments({ videoId }: { videoId: string }) {
           if (!s) return null;
           return (
             <div key={c.id} className="anime-border flex gap-3 rounded-xl bg-card p-4">
-              <img src={s.authorProfileImageUrl} alt={s.authorDisplayName} className="h-10 w-10 rounded-full" loading="lazy" />
+              <img
+                src={s.authorProfileImageUrl}
+                alt={s.authorDisplayName}
+                className="h-10 w-10 rounded-full shrink-0"
+                loading="lazy"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+              />
               <div className="flex-1">
                 <div className="flex items-center gap-2 text-sm">
                   <span className="font-bold text-foreground">{s.authorDisplayName}</span>

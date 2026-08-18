@@ -2,6 +2,7 @@ import { Navbar } from "@/components/Navbar";
 import { Sidebar } from "@/components/Sidebar";
 import { formatViews, timeAgo } from "@/lib/format";
 import { searchVideos } from "@/lib/youtube.functions";
+import { useSeo } from "@/lib/seo";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
@@ -166,6 +167,11 @@ function ShortsPage() {
   const [activeIndex, setActiveIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  useSeo({
+    title: "Anime Shorts — Video Pendek Anime Terbaik",
+    description: "Tonton anime shorts, AMV, dan edit video anime terbaik dalam format vertical seperti YouTube Shorts.",
+    path: "/shorts",
+  });
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
     queryKey: ["shorts-yt-style"],
     queryFn: ({ pageParam }) => searchVideos({

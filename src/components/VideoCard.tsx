@@ -120,7 +120,7 @@ export function VideoCard({ video, variant = "grid" }: { video: YTVideo; variant
 
       {/* Info row — YouTube style */}
       <div className="mt-3 flex gap-3">
-        <ChannelAvatar name={channelName} />
+        <ChannelAvatar name={channelName} src={video._channelAvatar} />
         <div className="min-w-0 flex-1">
           <h3 className="line-clamp-2 text-sm font-medium text-foreground leading-snug">
             {video.snippet.title}

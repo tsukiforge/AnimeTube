@@ -5,6 +5,7 @@ import { Sidebar } from "@/components/Sidebar";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import { VideoCard } from "@/components/VideoCard";
 import { searchVideos } from "@/lib/youtube.functions";
+import { useSeo } from "@/lib/seo";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { fallback, zodValidator } from "@tanstack/zod-adapter";
@@ -24,6 +25,14 @@ export const Route = createFileRoute("/search")({
 function SearchPage() {
   const { q, order, videoDuration } = Route.useSearch();
   const navigate = useNavigate({ from: "/search" });
+
+  useSeo({
+    title: q ? `Hasil Pencarian: ${q}` : "Cari Anime",
+    description: q
+      ? `Hasil pencarian video anime "${q}" — temukan anime trending, populer, dan terbaru secara gratis.`
+      : "Cari anime favoritmu — ribuan video anime dari semua genre, gratis tanpa login.",
+    path: `/search?q=${encodeURIComponent(q || "")}`,
+  });
 
   const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
     queryKey: ["search", q, order, videoDuration],
