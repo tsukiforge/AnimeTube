@@ -45,6 +45,9 @@ jobs:
       - name: Build web app (VITE_API_BASE di-bake ke bundle)
         run: npm run build
 
+      - name: Generate app icons & splash (assets/)
+        run: npx capacitor-assets generate --iconBackgroundColor '#0f0f0f' --splashBackgroundColor '#0f0f0f'
+
       - name: Add Capacitor Android platform
         run: |
           [ -d android ] || npx cap add android
@@ -101,6 +104,9 @@ jobs:
 
       - name: Build web app (VITE_API_BASE di-bake ke bundle)
         run: npm run build
+
+      - name: Generate app icons & splash (assets/)
+        run: npx capacitor-assets generate --iconBackgroundColor '#0f0f0f' --splashBackgroundColor '#0f0f0f'
 
       - name: Add Capacitor iOS platform
         run: |

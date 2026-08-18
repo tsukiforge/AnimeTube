@@ -16,9 +16,9 @@ function LivePage() {
     description: "Nonton live stream anime 24/7 dan jadwal premier terbaru. Siaran langsung anime gratis tanpa login.",
     path: "/live",
   });
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["live"],
-    queryFn: () => searchVideos({ q: "anime live 24/7", eventType: "live", order: "viewCount", maxResults: 24 }),
+    queryFn: () => searchVideos({ q: "anime live", eventType: "live", order: "viewCount", maxResults: 24 }),
     staleTime: 60 * 1000,
   });
   const { data: upcoming } = useQuery({
@@ -44,11 +44,23 @@ function LivePage() {
               <span className="text-xs text-muted-foreground">Anime broadcasts streaming right now</span>
             </header>
             <section className="grid gap-x-4 gap-y-8 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {isLoading || !data
+              {isError && (
+                <div className="col-span-full rounded-xl border border-border bg-card p-8 text-center">
+                  <p className="text-2xl mb-2">📡</p>
+                  <p className="text-sm text-muted-foreground">Gagal memuat live stream. Coba lagi.</p>
+                  <button
+                    onClick={() => refetch()}
+                    className="mt-4 text-xs font-bold text-primary hover:underline"
+                  >
+                    Muat ulang
+                  </button>
+                </div>
+              )}
+              {isLoading || (!isError && !data)
                 ? Array.from({ length: 8 }).map((_, i) => <SkeletonCard key={i} index={i} />)
-                : data.items.length === 0
+                : !isError && data && data.items.length === 0
                 ? <p className="col-span-full text-muted-foreground">No live anime streams right now. Check back soon.</p>
-                : data.items.map((v: any) => <VideoCard key={v.id} video={v} />)}
+                : data?.items.map((v: any) => <VideoCard key={v.id} video={v} />)}
             </section>
             <AdSlot id="ad-live-mid" size="leaderboard" />
             {upcoming?.items?.length ? (

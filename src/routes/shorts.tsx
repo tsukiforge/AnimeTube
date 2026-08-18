@@ -1,21 +1,44 @@
 import { Navbar } from "@/components/Navbar";
 import { Sidebar } from "@/components/Sidebar";
 import { formatViews, timeAgo } from "@/lib/format";
-import { searchVideos } from "@/lib/youtube.functions";
+import { getVideo, searchVideos } from "@/lib/youtube.functions";
 import { useSeo } from "@/lib/seo";
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { fallback, zodValidator } from "@tanstack/zod-adapter";
 import {
   ChevronDown, ChevronUp, ExternalLink,
-  Heart, MessageCircle, Play, Share2,
+  Heart, MessageCircle, Music2, Play, Share2,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { z } from "zod";
 
-export const Route = createFileRoute("/shorts")({ component: ShortsPage });
+const shortsSchema = z.object({
+  v: fallback(z.string(), "").default(""),
+});
 
-function ShortCard({ video, active, onNext }: {
+export const Route = createFileRoute("/shorts")({
+  validateSearch: zodValidator(shortsSchema),
+  component: ShortsPage,
+});
+
+// Deteksi attribution musik dari tags/title (YouTube API v3 tidak expose
+// field lagu; kita pakai sinyal teks yang umum di judul/tag video anime).
+const MUSIC_KEYWORDS = /(amv|music|song|cover|ost|remix|viral|audio|mv|full\s?version|instrumental)/i;
+function getMusicAttribution(video: any): string | null {
+  const tags: string[] = video.snippet?.tags || [];
+  for (const t of tags) {
+    if (MUSIC_KEYWORDS.test(t)) return t.replace(/^#/, "").replace(/_/g, " ").trim();
+  }
+  const title: string = video.snippet?.title || "";
+  if (MUSIC_KEYWORDS.test(title)) return title.replace(/[|【】]/g, "").split(/\s{2,}/)[0]?.trim().slice(0, 60) || "Musik anime";
+  return null;
+}
+
+function ShortCard({ video, active, autoPlay, onNext }: {
   video: any;
   active: boolean;
+  autoPlay?: boolean;
   onNext: () => void;
 }) {
   const navigate = useNavigate();
@@ -23,8 +46,9 @@ function ShortCard({ video, active, onNext }: {
   const thumb =
     video.snippet.thumbnails?.high?.url ||
     video.snippet.thumbnails?.medium?.url;
-  const [playing, setPlaying] = useState(false);
+  const [playing, setPlaying] = useState(!!autoPlay);
   const ytUrl = `https://www.youtube.com/watch?v=${id}`;
+  const music = getMusicAttribution(video);
 
   // Reset playing state when card becomes inactive
   useEffect(() => {
@@ -66,15 +90,24 @@ function ShortCard({ video, active, onNext }: {
             </div>
           </div>
         ) : (
-          /* YouTube embed — only when tapped */
+          /* YouTube embed — only when tapped (pakai nocookie + playsinline) */
           <iframe
             key={id}
-            src={`https://www.youtube.com/embed/${id}?autoplay=1&rel=0&modestbranding=1&playsinline=1&controls=1`}
+            src={`https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0&modestbranding=1&playsinline=1&controls=1`}
             title={video.snippet.title}
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen
+            referrerPolicy="strict-origin-when-cross-origin"
             className="absolute inset-0 h-full w-full border-0"
           />
+        )}
+
+        {/* Music attribution — logo musik jika ada */}
+        {music && (
+          <div className="absolute bottom-4 left-3 z-10 flex items-center gap-2 rounded-full bg-black/50 backdrop-blur-sm px-3 py-1.5 text-white">
+            <Music2 size={14} className="text-white/80 shrink-0" />
+            <span className="text-[11px] font-medium truncate max-w-[200px]">{music}</span>
+          </div>
         )}
 
         {/* Bottom gradient — only show when not playing */}
@@ -116,13 +149,13 @@ function ShortCard({ video, active, onNext }: {
             </a>
 
             <button
-              onClick={() => navigate({ to: "/watch", search: { v: id } })}
+              onClick={() => navigate({ to: "/shorts", search: { v: id } })}
               className="flex flex-col items-center gap-1 text-white"
             >
               <div className="h-10 w-10 rounded-full bg-white/10 backdrop-blur-sm grid place-items-center">
                 <MessageCircle size={20} />
               </div>
-              <span className="text-[10px]">Watch</span>
+              <span className="text-[10px]">Shorts</span>
             </button>
 
             <button
@@ -164,6 +197,7 @@ function ShortCard({ video, active, onNext }: {
 }
 
 function ShortsPage() {
+  const { v } = Route.useSearch();
   const [activeIndex, setActiveIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -172,6 +206,15 @@ function ShortsPage() {
     description: "Tonton anime shorts, AMV, dan edit video anime terbaik dalam format vertical seperti YouTube Shorts.",
     path: "/shorts",
   });
+
+  // Video awal dari ?v= — diputar langsung (player ringan, tanpa komentar)
+  const { data: initialVideo } = useQuery({
+    queryKey: ["shorts-initial", v],
+    queryFn: () => getVideo(v || ""),
+    enabled: !!v,
+    staleTime: 5 * 60 * 1000,
+  });
+
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
     queryKey: ["shorts-yt-style"],
     queryFn: ({ pageParam }) => searchVideos({
@@ -186,7 +229,11 @@ function ShortsPage() {
     staleTime: 5 * 60 * 1000,
   });
 
-  const allItems = data?.pages.flatMap((p: any) => p.items) ?? [];
+  // Feed shorts + video ?v= di posisi pertama (dedupe)
+  const feedItems = data?.pages.flatMap((p: any) => p.items) ?? [];
+  const allItems = initialVideo?.item
+    ? [initialVideo.item, ...feedItems.filter((x: any) => x.id !== v)]
+    : feedItems;
 
   useEffect(() => {
     if (activeIndex >= allItems.length - 3 && hasNextPage && !isFetchingNextPage) {
@@ -241,6 +288,7 @@ function ShortsPage() {
                 <ShortCard
                   video={video}
                   active={i === activeIndex}
+                  autoPlay={i === 0 && !!v}
                   onNext={() => goTo(i + 1)}
                 />
               </div>

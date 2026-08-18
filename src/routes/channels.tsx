@@ -5,7 +5,8 @@ import { getAnimeChannels } from "@/lib/youtube.functions";
 import { useSeo } from "@/lib/seo";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ExternalLink, RefreshCw, Tv2 } from "lucide-react";
+import { ChevronDown, ExternalLink, RefreshCw, Tv2 } from "lucide-react";
+import { useState } from "react";
 
 export const Route = createFileRoute("/channels")({ component: ChannelsPage });
 
@@ -94,10 +95,13 @@ function ChannelsPage() {
   });
 
   const channels = data?.channels ?? [];
+  const [visibleCount, setVisibleCount] = useState(5);
+  const visible = channels.slice(0, visibleCount);
 
   const handleRefresh = () => {
     // Clear localStorage cache to force refresh
     try { localStorage.removeItem("animetube:channels:v1"); } catch {}
+    setVisibleCount(5);
     refetch();
   };
 
@@ -117,7 +121,7 @@ function ChannelsPage() {
                 <div>
                   <h1 className="text-2xl font-bold text-foreground">Anime Channels</h1>
                   <p className="text-xs text-muted-foreground">
-                    10 channel anime populer · diperbarui setiap minggu
+                    {channels.length} channel anime populer · diperbarui setiap minggu
                   </p>
                 </div>
               </div>
@@ -158,9 +162,20 @@ function ChannelsPage() {
               </div>
             ) : (
               <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {channels.map((ch: any) => (
+                {visible.map((ch: any) => (
                   <ChannelCard key={ch.id} ch={ch} />
                 ))}
+              </div>
+            )}
+            {channels.length > visibleCount && (
+              <div className="mt-8 flex justify-center">
+                <button
+                  onClick={() => setVisibleCount((c) => c + 5)}
+                  className="flex items-center gap-2 rounded-lg border border-border bg-card px-6 py-2.5 text-xs font-bold text-foreground hover:border-primary/40 hover:text-primary transition-colors"
+                >
+                  <ChevronDown size={14} />
+                  Show more ({channels.length - visibleCount} channel lagi)
+                </button>
               </div>
             )}
           </div>

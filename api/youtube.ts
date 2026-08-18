@@ -22,8 +22,10 @@ async function fetchYT(path: string, params: Record<string, string>, key: string
   Object.entries(params).forEach(([k, v]) => {
     if (v !== undefined && v !== "") url.searchParams.set(k, String(v));
   });
-  // ALWAYS enforce safeSearch=strict — cannot be overridden by client
-  if (path === "search") url.searchParams.set("safeSearch", "strict");
+  // ALWAYS enforce safeSearch=strict — cannot be overridden by client.
+  // EXCEPT: eventType=live|upcoming + safeSearch=strict = bug kombinasi YouTube
+  // API yang selalu mengembalikan 0 items (totalResults > 0 tapi items []).
+  if (path === "search" && !params.eventType) url.searchParams.set("safeSearch", "strict");
   url.searchParams.set("key", key);
   return fetch(url.toString());
 }

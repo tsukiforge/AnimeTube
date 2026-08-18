@@ -192,7 +192,9 @@ export async function searchVideos(params: SearchParams = {}) {
   const json = await yt("search", {
     part: "snippet", type: "video", q, maxResults, order,
     videoDuration, pageToken, channelId, eventType,
-    regionCode, relevanceLanguage, safeSearch: "strict",
+    // safeSearch + eventType=live/upcoming = bug YouTube (0 items) — skip untuk live
+    safeSearch: eventType ? undefined : "strict",
+    regionCode, relevanceLanguage,
   });
   const ids = (json.items || []).map((i: any) => i.id?.videoId).filter(Boolean).join(",");
   let details: any = { items: [] };
@@ -236,18 +238,22 @@ export async function getComments(videoId: string) {
   }
 }
 
-export async function getRelated(q: string, excludeId?: string) {
+export async function getRelated(q: string, excludeId?: string, pageToken?: string) {
   const json = await yt("search", {
-    part: "snippet", type: "video", q, maxResults: 16, order: "relevance", safeSearch: "strict",
+    part: "snippet", type: "video", q, maxResults: 10, order: "relevance",
+    pageToken, safeSearch: "strict",
   });
   const ids = (json.items || [])
     .map((i: any) => i.id?.videoId)
     .filter((id: string) => id && id !== excludeId)
-    .slice(0, 15)
+    .slice(0, 10)
     .join(",");
-  if (!ids) return { items: [] };
+  if (!ids) return { items: [], nextPageToken: undefined };
   const details = await yt("videos", { part: "snippet,statistics,contentDetails", id: ids });
-  return { items: await attachChannelAvatars(processYouTubeResponse(details.items || [])) };
+  return {
+    items: await attachChannelAvatars(processYouTubeResponse(details.items || [])),
+    nextPageToken: json.nextPageToken as string | undefined,
+  };
 }
 
 export async function getChannel(id: string) {
@@ -255,21 +261,35 @@ export async function getChannel(id: string) {
   return { channel: json.items?.[0] || null };
 }
 
-// Real popular anime channels — refreshed weekly
+// Nama channel anime populer — dicari via API (type=channel) agar selalu
+// channel asli, bukan hardcoded ID yang bisa salah/berubah.
 const REAL_ANIME_CHANNELS = [
-  "UCVTyTA7-g9nopHeHbeuvpRA", // Crunchyroll
-  "UCoqWQehkMEBqBFkFGa-IQKA", // Muse Asia
-  "UCFvLHPAMHBkJbBMBqohFMXg", // Ani-One Asia
-  "UC0wNSTMWIL3qaorLx0jie6A", // Netflix Anime
-  "UCszoNXOCKFfFHHFMFBMBqhA", // Bilibili Anime
-  "UCkejXKmFMFkFMFkFMFkFMFk", // Funimation
-  "UCgnfPPb9JI3e9A4cXHnWbyg", // AniDex
-  "UCqm3BQLlJfvkTsX_hvm0UmA", // Toei Animation
-  "UCxx7cbiqZZ_xP9H4IUk3B0g", // Bandai Namco
-  "UCBcRF18a7Qf58cCRy5xuWwQ", // Madman Anime
+  "Crunchyroll",
+  "Muse Asia",
+  "Ani-One Asia",
+  "Netflix Anime",
+  "Toei Animation",
+  "Bilibili Anime",
+  "Funimation",
+  "AniDex",
+  "Madman Anime",
+  "Muse Indonesia",
+  "Ani-One Indonesia",
+  "Anime America",
+  "HIDIVE",
+  "Aniplex",
+  "Kadokawa Anime",
+  "Darkness Anime",
+  "Asian Crush",
+  "Sentai Filmworks",
+  "Anime Adventures",
+  "MUSE U.K.",
 ];
 
-/** Get 10 random anime channels, refreshed weekly via localStorage */
+/**
+ * Cari channel anime asli via YouTube search (type=channel).
+ * Refresh mingguan (localStorage cache) — hemat quota.
+ */
 export async function getAnimeChannels() {
   const CACHE_KEY = "animetube:channels:v1";
   const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
@@ -283,20 +303,37 @@ export async function getAnimeChannels() {
     }
   } catch {}
 
-  // Pick 10 random from list
-  const shuffled = [...REAL_ANIME_CHANNELS].sort(() => Math.random() - 0.5).slice(0, 10);
-  const ids = shuffled.join(",");
+  // Cari tiap nama channel (1 unit per pencarian — refresh mingguan)
+  // Relevance search type=channel sudah sangat akurat untuk nama kanonik,
+  // jadi hasil pertama langsung dipakai (filter ketat justru membuang
+  // channel sah dengan judul non-ASCII, mis. Toei Animation 東映アニメーション).
+  const found = await Promise.all(
+    REAL_ANIME_CHANNELS.map(async (name) => {
+      try {
+        const json = await yt("search", {
+          part: "snippet", type: "channel", q: name, maxResults: 1, order: "relevance",
+        });
+        const ch = json.items?.[0]?.snippet;
+        if (!ch?.channelId) return null;
+        return {
+          id: ch.channelId,
+          snippet: {
+            title: ch.title,
+            description: ch.description || "",
+            thumbnails: ch.thumbnails || {},
+          },
+        };
+      } catch {
+        return null;
+      }
+    })
+  );
 
-  try {
-    const json = await yt("channels", {
-      part: "snippet,statistics",
-      id: ids,
-      maxResults: 10,
-    });
-    const channels = json.items || [];
+  // Dedupe (beberapa nama bisa menunjuk channel yang sama)
+  const seenIds = new Set<string>();
+  const channels = found.filter((c): c is any => !!c && !seenIds.has(c.id) && !!seenIds.add(c.id));
+  if (channels.length) {
     localStorage.setItem(CACHE_KEY, JSON.stringify({ data: channels, ts: Date.now() }));
-    return { channels };
-  } catch {
-    return { channels: [] };
   }
+  return { channels };
 }

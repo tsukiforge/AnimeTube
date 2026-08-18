@@ -58,6 +58,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
     "@eslint/js": "^9.32.0",
     "@types/node": "^22.16.5",
     "@types/react": "^19.2.0",
@@ -76,7 +77,7 @@
     "vite": "^7.3.1"
   },
   "name": "animetube",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "private": true,
   "scripts": {
     "build": "vite build",
@@ -85,8 +86,9 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "cap:sync": "cap sync",
-    "cap:android": "npm run build && cap sync android && cd android && ./gradlew assembleDebug",
-    "cap:ios": "npm run build && cap sync ios",
+    "cap:assets": "capacitor-assets generate --iconBackgroundColor '#0f0f0f' --splashBackgroundColor '#0f0f0f'",
+    "cap:android": "npm run cap:assets && npm run build && cap sync android && cd android && ./gradlew assembleDebug",
+    "cap:ios": "npm run cap:assets && npm run build && cap sync ios",
     "cap:open:android": "cap open android",
     "cap:open:ios": "cap open ios"
   },

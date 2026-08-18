@@ -9,11 +9,12 @@ import { formatWatchTime, useWatchTimer } from "@/hooks/use-watch-timer";
 import { formatViews, timeAgo } from "@/lib/format";
 import { getComments, getRelated, getVideo } from "@/lib/youtube.functions";
 import { useSeo } from "@/lib/seo";
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
 import { fallback, zodValidator } from "@tanstack/zod-adapter";
 import { Maximize2, Minimize2, X as XIcon } from "lucide-react";
 import { Component, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -56,13 +57,16 @@ class SectionErrorBoundary extends Component<{ children: React.ReactNode; fallba
 }
 
 // ── Mini Player (PiP) ─────────────────────────────────────────────
+// HOST-ONLY: iframe video TIDAK dibuat di sini. Video utama (satu-satunya
+// instance) dipindah ke sini via React portal saat showMini — sehingga
+// posisi waktu & state player 100% sinkron dengan player utama.
 function MiniPlayer({
-  videoId, title, onClose, onExpand,
+  title, onClose, onExpand, videoHostRef,
 }: {
-  videoId: string;
   title: string;
   onClose: () => void;
   onExpand: () => void;
+  videoHostRef: (el: HTMLDivElement | null) => void;
 }) {
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
@@ -126,18 +130,70 @@ function MiniPlayer({
           </button>
         </div>
       </div>
-      {/* Video */}
-      <div className="relative bg-black" style={{ aspectRatio: "16/9" }}>
-        <iframe
-          src={`https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&controls=1&playsinline=1`}
-          title={title}
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-          allowFullScreen
-          referrerPolicy="strict-origin-when-cross-origin"
-          className="absolute inset-0 h-full w-full border-0"
-        />
-      </div>
+      {/* Video host — iframe utama dipindah ke sini via portal */}
+      <div
+        ref={videoHostRef}
+        className="relative bg-black"
+        style={{ aspectRatio: "16/9" }}
+      />
     </div>
+  );
+}
+
+// Single iframe YouTube player — SATU instance untuk player utama & miniplayer.
+// Dirender di main slot, lalu di-portal ke MiniPlayer tanpa remount.
+function VideoFrame({
+  videoId, title, playerError, onRetry,
+}: {
+  videoId: string;
+  title: string;
+  playerError: boolean;
+  onRetry: () => void;
+}) {
+  // origin param hanya untuk http(s) — di WebView (capacitor://localhost) di-omit
+  const isHttpOrigin = /^https?:\/\//.test(window.location.origin);
+  const jsapiParam = isHttpOrigin
+    ? `&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`
+    : "&enablejsapi=1";
+  const ytWatchUrl = `https://www.youtube.com/watch?v=${videoId}`;
+
+  return (
+    <>
+      <iframe
+        src={`https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&iv_load_policy=3&controls=1&playsinline=1${jsapiParam}`}
+        title={title}
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+        allowFullScreen
+        referrerPolicy="strict-origin-when-cross-origin"
+        className="absolute inset-0 h-full w-full border-0"
+      />
+      {playerError && (
+        <div className="absolute inset-0 z-10 grid place-items-center bg-black">
+          <div className="px-4 text-center">
+            <p className="mb-1 text-sm font-semibold text-white">Video tidak dapat diputar</p>
+            <p className="mb-4 text-xs text-white/60">
+              Video ini tidak mengizinkan diputar di situs lain (embedding dinonaktifkan).
+            </p>
+            <div className="flex justify-center gap-2">
+              <a
+                href={ytWatchUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-full bg-primary px-4 py-2 text-xs font-bold text-primary-foreground hover:opacity-90 transition-opacity"
+              >
+                Tonton di YouTube
+              </a>
+              <button
+                onClick={onRetry}
+                className="rounded-full border border-border bg-surface px-4 py-2 text-xs font-bold text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Coba lagi
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -179,6 +235,8 @@ function VideoMain({ autoNextId }: { autoNextId: string | null }) {
   const [playerError, setPlayerError] = useState(false);
   const [playerAttempt, setPlayerAttempt] = useState(0);
   const playerRef = useRef<HTMLDivElement>(null);
+  // Host div di dalam MiniPlayer — iframe utama di-portal ke sini (single instance)
+  const [miniHost, setMiniHost] = useState<HTMLDivElement | null>(null);
 
   // ── Watch timer — health reminder after 5h ────────────────────
   const handleHealthToast = useCallback(
@@ -312,54 +370,26 @@ function VideoMain({ autoNextId }: { autoNextId: string | null }) {
   const ytWatchUrl = `https://www.youtube.com/watch?v=${v}`;
   const downloadUrl = `https://yt1s.com/youtube/${v}`;
 
-  // origin param hanya untuk http(s) — di WebView (capacitor://localhost) di-omit
-  const isHttpOrigin = /^https?:\/\//.test(window.location.origin);
-  const jsapiParam = isHttpOrigin
-    ? `&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`
-    : "&enablejsapi=1";
+  // SATU instance player — dirender di main slot, di-portal ke MiniPlayer saat scroll.
+  // Iframe yang sama → posisi & state player identik (bukan duplikat seperti sebelumnya).
+  const playerFrame = (
+    <VideoFrame
+      key={`${v}-${playerAttempt}`}
+      videoId={v}
+      title={video.snippet.title}
+      playerError={playerError}
+      onRetry={() => {
+        setPlayerError(false);
+        setPlayerAttempt((n) => n + 1);
+      }}
+    />
+  );
 
   return (
     <div>
       <div ref={playerRef} className="overflow-hidden rounded-xl">
         <div className="relative aspect-video bg-black">
-          <iframe
-            key={`${v}-${playerAttempt}`}
-            src={`https://www.youtube-nocookie.com/embed/${v}?autoplay=1&rel=0&modestbranding=1&iv_load_policy=3&controls=1&playsinline=1${jsapiParam}`}
-            title={video.snippet.title}
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-            allowFullScreen
-            referrerPolicy="strict-origin-when-cross-origin"
-            className="absolute inset-0 h-full w-full border-0"
-          />
-          {playerError && (
-            <div className="absolute inset-0 z-10 grid place-items-center bg-black">
-              <div className="px-4 text-center">
-                <p className="mb-1 text-sm font-semibold text-white">Video tidak dapat diputar</p>
-                <p className="mb-4 text-xs text-white/60">
-                  Video ini tidak mengizinkan diputar di situs lain (embedding dinonaktifkan).
-                </p>
-                <div className="flex justify-center gap-2">
-                  <a
-                    href={ytWatchUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="rounded-full bg-primary px-4 py-2 text-xs font-bold text-primary-foreground hover:opacity-90 transition-opacity"
-                  >
-                    Tonton di YouTube
-                  </a>
-                  <button
-                    onClick={() => {
-                      setPlayerError(false);
-                      setPlayerAttempt((n) => n + 1);
-                    }}
-                    className="rounded-full border border-border bg-surface px-4 py-2 text-xs font-bold text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    Coba lagi
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
+          {!showMini && playerFrame}
         </div>
         {/* PiP button overlay */}
         <div className="flex items-center justify-between bg-[#1f1f1f] px-3 py-1.5">
@@ -382,18 +412,17 @@ function VideoMain({ autoNextId }: { autoNextId: string | null }) {
         </div>
       </div>
 
-      {/* Mini Player */}
-      {showMini && video && (
-        <MiniPlayer
-          videoId={v}
-          title={video.snippet.title}
-          onClose={() => setShowMini(false)}
-          onExpand={() => {
-            setShowMini(false);
-            playerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-          }}
-        />
-      )}
+      {/* Mini Player — host video; iframe utama di-portal ke sini (sinkron) */}
+      <MiniPlayer
+        title={video.snippet.title}
+        onClose={() => setShowMini(false)}
+        onExpand={() => {
+          setShowMini(false);
+          playerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+        }}
+        videoHostRef={setMiniHost}
+      />
+      {showMini && miniHost && createPortal(playerFrame, miniHost)}
 
       {/* Auto-next countdown banner */}
       {countdown !== null && autoNextId && (
@@ -563,17 +592,27 @@ function Related({ onFirstVideo }: { onFirstVideo?: (id: string) => void }) {
     enabled: !!v,
   });
   const q = videoData?.item?.snippet?.title?.split(" ").slice(0, 4).join(" ") || "anime";
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isFetchingNextPage, hasNextPage, fetchNextPage } = useInfiniteQuery({
     queryKey: ["related", v, q],
-    queryFn: () => getRelated(q, v),
+    queryFn: ({ pageParam }) => getRelated(q, v, pageParam as string | undefined),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (last: any) => last.nextPageToken ?? undefined,
     enabled: !!videoData,
+  });
+
+  // Dedupe antar halaman, tapi jaga halaman pertama tetap tampil duluan
+  const seen = new Set<string>();
+  const items = (data?.pages ?? []).flatMap((p: any) => p.items).filter((it: any) => {
+    if (seen.has(it.id)) return false;
+    seen.add(it.id);
+    return true;
   });
 
   // Pass first related video id up for auto-next
   useEffect(() => {
-    const firstId = data?.items?.[0]?.id;
+    const firstId = items[0]?.id;
     if (firstId && onFirstVideo) onFirstVideo(firstId);
-  }, [data, onFirstVideo]);
+  }, [items, onFirstVideo]);
 
   return (
     <aside>
@@ -583,8 +622,24 @@ function Related({ onFirstVideo }: { onFirstVideo?: (id: string) => void }) {
       <div className="space-y-2">
         {isLoading
           ? Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} compact />)
-          : data?.items?.map((v: any) => <VideoCard key={v.id} video={v} variant="compact" />)}
+          : items.map((v: any) => <VideoCard key={v.id} video={v} variant="compact" />)}
       </div>
+      {hasNextPage && (
+        <button
+          onClick={() => fetchNextPage()}
+          disabled={isFetchingNextPage}
+          className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-xs font-bold text-foreground hover:border-primary/40 hover:text-primary transition-colors disabled:opacity-50"
+        >
+          {isFetchingNextPage ? (
+            <>
+              <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-border border-t-primary" />
+              Memuat...
+            </>
+          ) : (
+            <>Show more</>
+          )}
+        </button>
+      )}
       <div className="mt-4"><AdSlot id="ad-watch-side" sticky /></div>
     </aside>
   );

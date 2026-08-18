@@ -82,12 +82,18 @@ export function VideoCard({ video, variant = "grid" }: { video: YTVideo; variant
     video.snippet.thumbnails?.high?.url ||
     video.snippet.thumbnails?.medium?.url;
   const channelName = video.snippet.channelTitle || "";
+  // Video pendek (<60s, bukan live) → buka player Shorts yang ringan (tanpa komentar)
+  const isShort =
+    video.snippet?.liveBroadcastContent !== "live" &&
+    durationSeconds(video.contentDetails?.duration) > 0 &&
+    durationSeconds(video.contentDetails?.duration) < 60;
+  const target = isShort ? { to: "/shorts" as const, search: { v: id } } : { to: "/watch" as const, search: { v: id } };
 
   if (variant === "compact") {
     return (
       <Link
-        to="/watch"
-        search={{ v: id }}
+        to={target.to}
+        search={target.search}
         className="group flex gap-2 rounded-lg p-2 hover:bg-surface transition-colors"
       >
         <div className="relative w-[168px] shrink-0 overflow-hidden rounded-lg bg-[#272727]" style={{ aspectRatio: "16/9" }}>
@@ -108,7 +114,11 @@ export function VideoCard({ video, variant = "grid" }: { video: YTVideo; variant
   }
 
   return (
-    <Link to="/watch" search={{ v: id }} className="group block">
+    <Link
+      to={target.to}
+      search={target.search}
+      className="group block"
+    >
       {/* Thumbnail */}
       <div
         className="relative w-full overflow-hidden rounded-xl bg-[#272727]"
