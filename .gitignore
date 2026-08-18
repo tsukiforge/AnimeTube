@@ -38,3 +38,6 @@ SETUP.md
 # Android release keystore — JANGAN pernah di-commit!
 *.keystore
 *.jks
+
+# Backup base64 keystore lokal (jangan di-commit)
+*.b64
