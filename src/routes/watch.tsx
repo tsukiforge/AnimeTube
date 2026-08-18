@@ -128,10 +128,11 @@ function MiniPlayer({
       {/* Video */}
       <div className="relative bg-black" style={{ aspectRatio: "16/9" }}>
         <iframe
-          src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&controls=1`}
+          src={`https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&controls=1&playsinline=1`}
           title={title}
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
           allowFullScreen
+          referrerPolicy="strict-origin-when-cross-origin"
           className="absolute inset-0 h-full w-full border-0"
         />
       </div>
@@ -166,6 +167,8 @@ function VideoMain({ autoNextId }: { autoNextId: string | null }) {
   const [countdown, setCountdown] = useState<number | null>(null);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [showMini, setShowMini] = useState(false);
+  const [playerError, setPlayerError] = useState(false);
+  const [playerAttempt, setPlayerAttempt] = useState(0);
   const playerRef = useRef<HTMLDivElement>(null);
 
   // ── Watch timer — health reminder after 5h ────────────────────
@@ -197,6 +200,12 @@ function VideoMain({ autoNextId }: { autoNextId: string | null }) {
     });
   }, [v, video]);
 
+  // Reset state player saat pindah video
+  useEffect(() => {
+    setPlayerError(false);
+    setPlayerAttempt(0);
+  }, [v]);
+
   // ── Keyboard shortcuts ────────────────────────────────────────
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -220,15 +229,19 @@ function VideoMain({ autoNextId }: { autoNextId: string | null }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [showMini, countdown]);
 
-  // Listen for YouTube iframe postMessage — detect video ended
+  // Listen for YouTube iframe postMessage — detect video ended or player error
   useEffect(() => {
     const onMessage = (e: MessageEvent) => {
-      if (e.origin !== "https://www.youtube.com") return;
+      if (e.origin !== "https://www.youtube.com" && e.origin !== "https://www.youtube-nocookie.com") return;
       try {
         const data = typeof e.data === "string" ? JSON.parse(e.data) : e.data;
         // YT iframe API: info.playerState === 0 means ended
         if (data?.event === "infoDelivery" && data?.info?.playerState === 0) {
           if (autoNextId) startCountdown(autoNextId);
+        }
+        // Player gagal dimuat (video tidak boleh di-embed, Error 153, dll)
+        if (data?.event === "onError") {
+          setPlayerError(true);
         }
       } catch {}
     };
@@ -290,18 +303,54 @@ function VideoMain({ autoNextId }: { autoNextId: string | null }) {
   const ytWatchUrl = `https://www.youtube.com/watch?v=${v}`;
   const downloadUrl = `https://yt1s.com/youtube/${v}`;
 
+  // origin param hanya untuk http(s) — di WebView (capacitor://localhost) di-omit
+  const isHttpOrigin = /^https?:\/\//.test(window.location.origin);
+  const jsapiParam = isHttpOrigin
+    ? `&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`
+    : "&enablejsapi=1";
+
   return (
     <div>
       <div ref={playerRef} className="overflow-hidden rounded-xl">
         <div className="relative aspect-video bg-black">
           <iframe
-            key={v}
-            src={`https://www.youtube.com/embed/${v}?autoplay=1&rel=0&modestbranding=1&iv_load_policy=3&controls=1&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`}
+            key={`${v}-${playerAttempt}`}
+            src={`https://www.youtube-nocookie.com/embed/${v}?autoplay=1&rel=0&modestbranding=1&iv_load_policy=3&controls=1&playsinline=1${jsapiParam}`}
             title={video.snippet.title}
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
             allowFullScreen
+            referrerPolicy="strict-origin-when-cross-origin"
             className="absolute inset-0 h-full w-full border-0"
           />
+          {playerError && (
+            <div className="absolute inset-0 z-10 grid place-items-center bg-black">
+              <div className="px-4 text-center">
+                <p className="mb-1 text-sm font-semibold text-white">Video tidak dapat diputar</p>
+                <p className="mb-4 text-xs text-white/60">
+                  Video ini tidak mengizinkan diputar di situs lain (embedding dinonaktifkan).
+                </p>
+                <div className="flex justify-center gap-2">
+                  <a
+                    href={ytWatchUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-full bg-primary px-4 py-2 text-xs font-bold text-primary-foreground hover:opacity-90 transition-opacity"
+                  >
+                    Tonton di YouTube
+                  </a>
+                  <button
+                    onClick={() => {
+                      setPlayerError(false);
+                      setPlayerAttempt((n) => n + 1);
+                    }}
+                    className="rounded-full border border-border bg-surface px-4 py-2 text-xs font-bold text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Coba lagi
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
         {/* PiP button overlay */}
         <div className="flex items-center justify-between bg-[#1f1f1f] px-3 py-1.5">
