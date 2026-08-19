@@ -14,7 +14,6 @@ import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
 import { fallback, zodValidator } from "@tanstack/zod-adapter";
 import { Maximize2, Minimize2, X as XIcon } from "lucide-react";
 import { Component, Suspense, useCallback, useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -28,8 +27,14 @@ export const Route = createFileRoute("/watch")({
 });
 
 // ── Section-level Error Boundary ─────────────────────────────────
-interface EBState { hasError: boolean; message: string }
-class SectionErrorBoundary extends Component<{ children: React.ReactNode; fallback?: React.ReactNode }, EBState> {
+interface EBState {
+  hasError: boolean;
+  message: string;
+}
+class SectionErrorBoundary extends Component<
+  { children: React.ReactNode; fallback?: React.ReactNode },
+  EBState
+> {
   constructor(props: { children: React.ReactNode; fallback?: React.ReactNode }) {
     super(props);
     this.state = { hasError: false, message: "" };
@@ -39,17 +44,19 @@ class SectionErrorBoundary extends Component<{ children: React.ReactNode; fallba
   }
   render() {
     if (this.state.hasError) {
-      return this.props.fallback ?? (
-        <div className="rounded-xl border border-border bg-card p-6 text-center text-sm text-muted-foreground">
-          <p className="text-2xl mb-2">😵</p>
-          <p>{this.state.message}</p>
-          <button
-            onClick={() => this.setState({ hasError: false, message: "" })}
-            className="mt-3 text-xs text-primary hover:underline"
-          >
-            Coba lagi
-          </button>
-        </div>
+      return (
+        this.props.fallback ?? (
+          <div className="rounded-xl border border-border bg-card p-6 text-center text-sm text-muted-foreground">
+            <p className="text-2xl mb-2">😵</p>
+            <p>{this.state.message}</p>
+            <button
+              onClick={() => this.setState({ hasError: false, message: "" })}
+              className="mt-3 text-xs text-primary hover:underline"
+            >
+              Coba lagi
+            </button>
+          </div>
+        )
       );
     }
     return this.props.children;
@@ -57,93 +64,18 @@ class SectionErrorBoundary extends Component<{ children: React.ReactNode; fallba
 }
 
 // ── Mini Player (PiP) ─────────────────────────────────────────────
-// HOST-ONLY: iframe video TIDAK dibuat di sini. Video utama (satu-satunya
-// instance) dipindah ke sini via React portal saat showMini — sehingga
-// posisi waktu & state player 100% sinkron dengan player utama.
-function MiniPlayer({
-  title, onClose, onExpand, videoHostRef,
-}: {
-  title: string;
-  onClose: () => void;
-  onExpand: () => void;
-  videoHostRef: (el: HTMLDivElement | null) => void;
-}) {
-  const [pos, setPos] = useState({ x: 0, y: 0 });
-  const [dragging, setDragging] = useState(false);
-  const dragStart = useRef({ mx: 0, my: 0, px: 0, py: 0 });
-  const ref = useRef<HTMLDivElement>(null);
-
-  // Default position: bottom-right
-  useEffect(() => {
-    const w = window.innerWidth;
-    const h = window.innerHeight;
-    setPos({ x: w - 340, y: h - 220 });
-  }, []);
-
-  const onMouseDown = (e: React.MouseEvent) => {
-    setDragging(true);
-    dragStart.current = { mx: e.clientX, my: e.clientY, px: pos.x, py: pos.y };
-  };
-
-  useEffect(() => {
-    if (!dragging) return;
-    const onMove = (e: MouseEvent) => {
-      const dx = e.clientX - dragStart.current.mx;
-      const dy = e.clientY - dragStart.current.my;
-      setPos({
-        x: Math.max(0, Math.min(window.innerWidth - 320, dragStart.current.px + dx)),
-        y: Math.max(0, Math.min(window.innerHeight - 200, dragStart.current.py + dy)),
-      });
-    };
-    const onUp = () => setDragging(false);
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
-    return () => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
-  }, [dragging]);
-
-  return (
-    <div
-      ref={ref}
-      className="fixed z-[150] rounded-xl overflow-hidden shadow-2xl border border-border"
-      style={{ left: pos.x, top: pos.y, width: 320, cursor: dragging ? "grabbing" : "grab" }}
-    >
-      {/* Drag handle */}
-      <div
-        className="flex items-center justify-between bg-[#1f1f1f] px-2 py-1.5 select-none"
-        onMouseDown={onMouseDown}
-      >
-        <p className="text-[11px] text-muted-foreground truncate flex-1 mr-2">{title}</p>
-        <div className="flex items-center gap-1 shrink-0">
-          <button
-            onClick={onExpand}
-            className="grid h-6 w-6 place-items-center rounded text-muted-foreground hover:text-foreground hover:bg-surface transition-colors"
-            title="Perbesar"
-          >
-            <Maximize2 size={12} />
-          </button>
-          <button
-            onClick={onClose}
-            className="grid h-6 w-6 place-items-center rounded text-muted-foreground hover:text-foreground hover:bg-surface transition-colors"
-            title="Tutup"
-          >
-            <XIcon size={12} />
-          </button>
-        </div>
-      </div>
-      {/* Video host — iframe utama dipindah ke sini via portal */}
-      <div
-        ref={videoHostRef}
-        className="relative bg-black"
-        style={{ aspectRatio: "16/9" }}
-      />
-    </div>
-  );
-}
+// TIDAK pakai portal/duplikat: container player utama sendiri yang berubah
+// jadi fixed bottom-right via CSS saat showMini. Iframe TIDAK pernah
+// di-unmount/dipindah → posisi waktu & state player 100% sinkron tanpa reload.
+// (VideoFrame & player main) — lihat VideoMain.
 
 // Single iframe YouTube player — SATU instance untuk player utama & miniplayer.
 // Dirender di main slot, lalu di-portal ke MiniPlayer tanpa remount.
 function VideoFrame({
-  videoId, title, playerError, onRetry,
+  videoId,
+  title,
+  playerError,
+  onRetry,
 }: {
   videoId: string;
   title: string;
@@ -198,17 +130,35 @@ function VideoFrame({
 }
 
 function ActionButton({
-  label, icon, onClick, href, variant = "default",
+  label,
+  icon,
+  onClick,
+  href,
+  variant = "default",
 }: {
-  label: string; icon: string; onClick?: () => void; href?: string;
+  label: string;
+  icon: string;
+  onClick?: () => void;
+  href?: string;
   variant?: "default" | "primary" | "danger";
 }) {
   const cls =
     "inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-xs font-bold hover:border-primary hover:text-primary transition-colors " +
-    (variant === "primary" ? "bg-[var(--gradient-primary)] text-white border-transparent hover:text-white " : "") +
+    (variant === "primary"
+      ? "bg-[var(--gradient-primary)] text-white border-transparent hover:text-white "
+      : "") +
     (variant === "danger" ? "hover:text-destructive hover:border-destructive " : "");
-  if (href) return <a href={href} target="_blank" rel="noopener noreferrer" className={cls}><span>{icon}</span> <span>{label}</span></a>;
-  return <button onClick={onClick} className={cls}><span>{icon}</span> <span>{label}</span></button>;
+  if (href)
+    return (
+      <a href={href} target="_blank" rel="noopener noreferrer" className={cls}>
+        <span>{icon}</span> <span>{label}</span>
+      </a>
+    );
+  return (
+    <button onClick={onClick} className={cls}>
+      <span>{icon}</span> <span>{label}</span>
+    </button>
+  );
 }
 
 function VideoMain({ autoNextId }: { autoNextId: string | null }) {
@@ -235,8 +185,56 @@ function VideoMain({ autoNextId }: { autoNextId: string | null }) {
   const [playerError, setPlayerError] = useState(false);
   const [playerAttempt, setPlayerAttempt] = useState(0);
   const playerRef = useRef<HTMLDivElement>(null);
-  // Host div di dalam MiniPlayer — iframe utama di-portal ke sini (single instance)
-  const [miniHost, setMiniHost] = useState<HTMLDivElement | null>(null);
+  // Mini player CSS-fixed: posisi & drag (iframe tidak pernah dipindah DOM)
+  const [pos, setPos] = useState({ x: 0, y: 0 });
+  const [dragging, setDragging] = useState(false);
+  const dragStart = useRef({ mx: 0, my: 0, px: 0, py: 0 });
+  const showMiniRef = useRef(false);
+  showMiniRef.current = showMini;
+  // Setelah manual close/expand, jangan auto-reopen sampai player terlihat lagi
+  const suppressAuto = useRef(false);
+
+  // Default posisi mini player: bottom-right
+  useEffect(() => {
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    setPos({ x: w - 340, y: h - 220 });
+  }, []);
+
+  const closeMini = () => {
+    suppressAuto.current = true;
+    setShowMini(false);
+  };
+
+  const expandMini = () => {
+    suppressAuto.current = true;
+    setShowMini(false);
+    playerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+
+  const onDragStart = (e: React.PointerEvent) => {
+    setDragging(true);
+    dragStart.current = { mx: e.clientX, my: e.clientY, px: pos.x, py: pos.y };
+  };
+
+  useEffect(() => {
+    if (!dragging) return;
+    const onMove = (e: PointerEvent) => {
+      const dx = e.clientX - dragStart.current.mx;
+      const dy = e.clientY - dragStart.current.my;
+      setPos({
+        x: Math.max(0, Math.min(window.innerWidth - 320, dragStart.current.px + dx)),
+        y: Math.max(0, Math.min(window.innerHeight - 200, dragStart.current.py + dy)),
+      });
+    };
+    const onUp = () => setDragging(false);
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+  }, [dragging]);
 
   // ── Watch timer — health reminder after 5h ────────────────────
   const handleHealthToast = useCallback(
@@ -283,12 +281,21 @@ function VideoMain({ autoNextId }: { autoNextId: string | null }) {
       switch (e.key.toLowerCase()) {
         case "m":
           // Toggle mini player
-          setShowMini((s) => !s);
-          toast(showMini ? "Mini player dinonaktifkan" : "Mini player aktif", { duration: 1500 });
+          if (showMini) {
+            closeMini();
+            toast("Mini player dinonaktifkan", { duration: 1500 });
+          } else {
+            setShowMini(true);
+            toast("Mini player aktif", { duration: 1500 });
+          }
           break;
         case "escape":
-          if (showMini) { setShowMini(false); }
-          if (countdown !== null) { cancelCountdown(); }
+          if (showMini) {
+            closeMini();
+          }
+          if (countdown !== null) {
+            cancelCountdown();
+          }
           break;
       }
     };
@@ -299,7 +306,8 @@ function VideoMain({ autoNextId }: { autoNextId: string | null }) {
   // Listen for YouTube iframe postMessage — detect video ended or player error
   useEffect(() => {
     const onMessage = (e: MessageEvent) => {
-      if (e.origin !== "https://www.youtube.com" && e.origin !== "https://www.youtube-nocookie.com") return;
+      if (e.origin !== "https://www.youtube.com" && e.origin !== "https://www.youtube-nocookie.com")
+        return;
       try {
         const data = typeof e.data === "string" ? JSON.parse(e.data) : e.data;
         // YT iframe API: info.playerState === 0 means ended
@@ -336,21 +344,29 @@ function VideoMain({ autoNextId }: { autoNextId: string | null }) {
   };
 
   // Cleanup on unmount
-  useEffect(() => () => { if (countdownRef.current) clearInterval(countdownRef.current); }, []);
+  useEffect(
+    () => () => {
+      if (countdownRef.current) clearInterval(countdownRef.current);
+    },
+    [],
+  );
 
-  // Scroll detection — show mini player when video scrolls out of view
+  // Scroll detection — show mini player when video scrolls out of view.
+  // Guard: jangan auto-muncul saat first-load (belum scroll), jangan override
+  // saat mini aktif, dan hormati suppressAuto setelah user manual close.
   useEffect(() => {
     if (!playerRef.current) return;
     const observer = new IntersectionObserver(
       ([entry]) => {
-        // Show mini player when less than 20% of player is visible
-        if (!entry.isIntersecting && entry.intersectionRatio < 0.2) {
-          setShowMini(true);
-        } else {
+        if (showMiniRef.current) return;
+        if (entry.isIntersecting || entry.intersectionRatio >= 0.2) {
+          suppressAuto.current = false;
           setShowMini(false);
+        } else if (!suppressAuto.current && window.scrollY >= 100) {
+          setShowMini(true);
         }
       },
-      { threshold: [0, 0.2] }
+      { threshold: [0, 0.2] },
     );
     observer.observe(playerRef.current);
     return () => observer.disconnect();
@@ -362,7 +378,9 @@ function VideoMain({ autoNextId }: { autoNextId: string | null }) {
     return (
       <div className="rounded-xl border border-border bg-card p-8 text-center">
         <p className="mt-4 text-muted-foreground">Video not found.</p>
-        <Link to="/" className="mt-4 inline-block text-primary underline">Go home</Link>
+        <Link to="/" className="mt-4 inline-block text-primary underline">
+          Go home
+        </Link>
       </div>
     );
   }
@@ -387,42 +405,70 @@ function VideoMain({ autoNextId }: { autoNextId: string | null }) {
 
   return (
     <div>
-      <div ref={playerRef} className="overflow-hidden rounded-xl">
-        <div className="relative aspect-video bg-black">
-          {!showMini && playerFrame}
-        </div>
-        {/* PiP button overlay */}
-        <div className="flex items-center justify-between bg-[#1f1f1f] px-3 py-1.5">
-          <span className="text-[11px] text-muted-foreground">
-            Mini player — klik untuk aktifkan atau scroll ke bawah
-          </span>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowMini(true);
-              // Scroll ke bawah agar player keluar viewport
-              window.scrollBy({ top: 400, behavior: "smooth" });
-            }}
-            className="flex items-center gap-1.5 rounded px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground hover:bg-surface transition-colors"
-            title="Aktifkan Mini Player"
+      {/* SATU container player — iframe TIDAK pernah unmount/pindah DOM.
+          Saat showMini, container ini yang berubah jadi fixed bottom-right (CSS),
+          jadi video lanjut muter tanpa reload/error. */}
+      <div
+        ref={playerRef}
+        className={
+          showMini
+            ? "fixed z-[150] overflow-hidden rounded-xl border border-border shadow-2xl bg-black"
+            : "overflow-hidden rounded-xl"
+        }
+        style={
+          showMini
+            ? { left: pos.x, top: pos.y, width: 320, cursor: dragging ? "grabbing" : "grab" }
+            : undefined
+        }
+      >
+        {showMini && (
+          <div
+            className="flex items-center justify-between bg-[#1f1f1f] px-2 py-1.5 select-none touch-none"
+            onPointerDown={onDragStart}
           >
-            <Minimize2 size={13} />
-            <span>Mini Player</span>
-          </button>
-        </div>
+            <p className="text-[11px] text-muted-foreground truncate flex-1 mr-2">
+              {video.snippet.title}
+            </p>
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                onClick={expandMini}
+                className="grid h-6 w-6 place-items-center rounded text-muted-foreground hover:text-foreground hover:bg-surface transition-colors"
+                title="Perbesar"
+              >
+                <Maximize2 size={12} />
+              </button>
+              <button
+                onClick={closeMini}
+                className="grid h-6 w-6 place-items-center rounded text-muted-foreground hover:text-foreground hover:bg-surface transition-colors"
+                title="Tutup"
+              >
+                <XIcon size={12} />
+              </button>
+            </div>
+          </div>
+        )}
+        <div className="relative aspect-video bg-black">{playerFrame}</div>
+        {!showMini && (
+          <div className="flex items-center justify-between bg-[#1f1f1f] px-3 py-1.5">
+            <span className="text-[11px] text-muted-foreground">
+              Mini player — klik untuk aktifkan atau scroll ke bawah
+            </span>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowMini(true);
+                // Scroll ke bawah agar player keluar viewport
+                window.scrollBy({ top: 400, behavior: "smooth" });
+              }}
+              className="flex items-center gap-1.5 rounded px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground hover:bg-surface transition-colors"
+              title="Aktifkan Mini Player"
+            >
+              <Minimize2 size={13} />
+              <span>Mini Player</span>
+            </button>
+          </div>
+        )}
       </div>
-
-      {/* Mini Player — host video; iframe utama di-portal ke sini (sinkron) */}
-      <MiniPlayer
-        title={video.snippet.title}
-        onClose={() => setShowMini(false)}
-        onExpand={() => {
-          setShowMini(false);
-          playerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-        }}
-        videoHostRef={setMiniHost}
-      />
-      {showMini && miniHost && createPortal(playerFrame, miniHost)}
 
       {/* Auto-next countdown banner */}
       {countdown !== null && autoNextId && (
@@ -438,7 +484,10 @@ function VideoMain({ autoNextId }: { autoNextId: string | null }) {
               Batal
             </button>
             <button
-              onClick={() => { cancelCountdown(); navigate({ to: "/watch", search: { v: autoNextId } }); }}
+              onClick={() => {
+                cancelCountdown();
+                navigate({ to: "/watch", search: { v: autoNextId } });
+              }}
               className="rounded-md bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground hover:opacity-90 transition-opacity"
             >
               Putar sekarang
@@ -447,7 +496,9 @@ function VideoMain({ autoNextId }: { autoNextId: string | null }) {
         </div>
       )}
 
-      <h1 className="mt-4 font-display text-2xl font-bold leading-tight md:text-3xl">{video.snippet.title}</h1>
+      <h1 className="mt-4 font-display text-2xl font-bold leading-tight md:text-3xl">
+        {video.snippet.title}
+      </h1>
 
       <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
         <span>{formatViews(video.statistics?.viewCount)} views</span>
@@ -457,19 +508,32 @@ function VideoMain({ autoNextId }: { autoNextId: string | null }) {
       </div>
 
       <div className="mt-3 flex flex-wrap gap-2">
-        <ActionButton label={`Like  ${formatViews(video.statistics?.likeCount)}`} icon="👍" href={ytWatchUrl} />
+        <ActionButton
+          label={`Like  ${formatViews(video.statistics?.likeCount)}`}
+          icon="👍"
+          href={ytWatchUrl}
+        />
         <ActionButton label="Dislike" icon="👎" href={ytWatchUrl} />
-        <ActionButton label="Share" icon="↗" onClick={() => {
-          if (navigator.share) {
-            navigator.share({ title: video.snippet.title, url: window.location.href }).catch(() => {});
-          } else {
-            navigator.clipboard?.writeText(window.location.href).then(() => {
-              toast.success("Link disalin ke clipboard!");
-            }).catch(() => {
-              toast.error("Gagal menyalin link");
-            });
-          }
-        }} />
+        <ActionButton
+          label="Share"
+          icon="↗"
+          onClick={() => {
+            if (navigator.share) {
+              navigator
+                .share({ title: video.snippet.title, url: window.location.href })
+                .catch(() => {});
+            } else {
+              navigator.clipboard
+                ?.writeText(window.location.href)
+                .then(() => {
+                  toast.success("Link disalin ke clipboard!");
+                })
+                .catch(() => {
+                  toast.error("Gagal menyalin link");
+                });
+            }
+          }}
+        />
         <ActionButton label="Download" icon="⬇️" href={downloadUrl} variant="primary" />
         <ActionButton label="Watch on YouTube" icon="▶️" href={ytWatchUrl} />
       </div>
@@ -484,39 +548,61 @@ function VideoMain({ autoNextId }: { autoNextId: string | null }) {
             src={video._channelAvatar}
             alt={video.snippet.channelTitle}
             className="h-12 w-12 rounded-full object-cover ring-2 ring-border shrink-0"
-            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = "none";
+            }}
           />
         )}
-        <Link to="/channel/$channelId" params={{ channelId: video.snippet.channelId }}
+        <Link
+          to="/channel/$channelId"
+          params={{ channelId: video.snippet.channelId }}
           className="grid h-12 w-12 place-items-center rounded-full bg-primary/20 font-bold text-primary text-lg shrink-0"
-          style={{ display: video._channelAvatar ? "none" : "grid" }}>
+          style={{ display: video._channelAvatar ? "none" : "grid" }}
+        >
           {video.snippet.channelTitle?.[0] || "?"}
         </Link>
         <div className="flex-1">
-          <Link to="/channel/$channelId" params={{ channelId: video.snippet.channelId }}
-            className="font-bold text-foreground hover:text-primary">
+          <Link
+            to="/channel/$channelId"
+            params={{ channelId: video.snippet.channelId }}
+            className="font-bold text-foreground hover:text-primary"
+          >
             {video.snippet.channelTitle}
           </Link>
         </div>
       </div>
 
       <div className="anime-border mt-4 rounded-xl bg-card p-4">
-        <p className={`whitespace-pre-wrap text-sm text-muted-foreground ${showFull ? "" : "line-clamp-3"}`}>
+        <p
+          className={`whitespace-pre-wrap text-sm text-muted-foreground ${showFull ? "" : "line-clamp-3"}`}
+        >
           {video.snippet.description}
         </p>
-        <button onClick={() => setShowFull((s) => !s)} className="mt-2 text-xs font-bold text-primary hover:underline">
+        <button
+          onClick={() => setShowFull((s) => !s)}
+          className="mt-2 text-xs font-bold text-primary hover:underline"
+        >
           {showFull ? "Show Less" : "Show More"}
         </button>
         {video.snippet.tags?.length ? (
           <div className="mt-3 flex flex-wrap gap-2">
             {video.snippet.tags.slice(0, 12).map((t: string) => (
-              <Link key={t} to="/search" search={{ q: t }} className="anime-pill rounded-full px-3 py-1 text-xs">#{t}</Link>
+              <Link
+                key={t}
+                to="/search"
+                search={{ q: t }}
+                className="anime-pill rounded-full px-3 py-1 text-xs"
+              >
+                #{t}
+              </Link>
             ))}
           </div>
         ) : null}
       </div>
 
-      <div className="mt-4"><AdSlot id="ad-watch-below" size="leaderboard" /></div>
+      <div className="mt-4">
+        <AdSlot id="ad-watch-below" size="leaderboard" />
+      </div>
       <SectionErrorBoundary>
         <Comments videoId={v} />
       </SectionErrorBoundary>
@@ -549,7 +635,9 @@ function Comments({ videoId }: { videoId: string }) {
           ))}
         </div>
       )}
-      {data?.disabled && <p className="mt-3 text-sm text-muted-foreground">Comments are disabled for this video.</p>}
+      {data?.disabled && (
+        <p className="mt-3 text-sm text-muted-foreground">Comments are disabled for this video.</p>
+      )}
       <div className="mt-4 space-y-4">
         {data?.items?.map((c: any) => {
           const s = c.snippet?.topLevelComment?.snippet;
@@ -561,17 +649,27 @@ function Comments({ videoId }: { videoId: string }) {
                 alt={s.authorDisplayName}
                 className="h-10 w-10 rounded-full shrink-0"
                 loading="lazy"
-                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = "none";
+                }}
               />
               <div className="flex-1">
                 <div className="flex items-center gap-2 text-sm">
                   <span className="font-bold text-foreground">{s.authorDisplayName}</span>
                   <span className="text-xs text-muted-foreground">{timeAgo(s.publishedAt)}</span>
                 </div>
-                <p className="mt-1 text-sm text-foreground" dangerouslySetInnerHTML={{ __html: s.textDisplay }} />
+                <p
+                  className="mt-1 text-sm text-foreground"
+                  dangerouslySetInnerHTML={{ __html: s.textDisplay }}
+                />
                 <div className="mt-2 flex gap-3 text-xs text-muted-foreground">
                   <span>👍 {formatViews(s.likeCount)}</span>
-                  <a href={`https://www.youtube.com/watch?v=${videoId}&lc=${c.id}`} target="_blank" rel="noopener noreferrer" className="hover:text-primary">
+                  <a
+                    href={`https://www.youtube.com/watch?v=${videoId}&lc=${c.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-primary"
+                  >
                     Reply on YouTube
                   </a>
                 </div>
@@ -602,11 +700,13 @@ function Related({ onFirstVideo }: { onFirstVideo?: (id: string) => void }) {
 
   // Dedupe antar halaman, tapi jaga halaman pertama tetap tampil duluan
   const seen = new Set<string>();
-  const items = (data?.pages ?? []).flatMap((p: any) => p.items).filter((it: any) => {
-    if (seen.has(it.id)) return false;
-    seen.add(it.id);
-    return true;
-  });
+  const items = (data?.pages ?? [])
+    .flatMap((p: any) => p.items)
+    .filter((it: any) => {
+      if (seen.has(it.id)) return false;
+      seen.add(it.id);
+      return true;
+    });
 
   // Pass first related video id up for auto-next
   useEffect(() => {
@@ -640,7 +740,9 @@ function Related({ onFirstVideo }: { onFirstVideo?: (id: string) => void }) {
           )}
         </button>
       )}
-      <div className="mt-4"><AdSlot id="ad-watch-side" sticky /></div>
+      <div className="mt-4">
+        <AdSlot id="ad-watch-side" sticky />
+      </div>
     </aside>
   );
 }
@@ -658,7 +760,9 @@ function WatchPage() {
           <main className="flex-1 grid place-items-center py-32 text-center">
             <div>
               <p className="mt-4 text-muted-foreground">No video selected.</p>
-              <Link to="/" className="mt-3 text-primary underline">Browse trending</Link>
+              <Link to="/" className="mt-3 text-primary underline">
+                Browse trending
+              </Link>
             </div>
           </main>
         </div>
@@ -676,12 +780,14 @@ function WatchPage() {
               <VideoMain autoNextId={nextVideoId} />
             </Suspense>
           </SectionErrorBoundary>
-          <SectionErrorBoundary fallback={
-            <aside className="rounded-xl border border-border bg-card p-6 text-center text-sm text-muted-foreground">
-              <p className="text-2xl mb-2">📭</p>
-              <p>Gagal memuat video terkait</p>
-            </aside>
-          }>
+          <SectionErrorBoundary
+            fallback={
+              <aside className="rounded-xl border border-border bg-card p-6 text-center text-sm text-muted-foreground">
+                <p className="text-2xl mb-2">📭</p>
+                <p>Gagal memuat video terkait</p>
+              </aside>
+            }
+          >
             <Related onFirstVideo={(id) => setNextVideoId(id)} />
           </SectionErrorBoundary>
         </main>
