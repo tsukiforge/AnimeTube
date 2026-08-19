@@ -45,13 +45,13 @@ jobs:
       - name: Build web app (VITE_API_BASE di-bake ke bundle)
         run: npm run build
 
-      - name: Generate app icons & splash (assets/)
-        run: npx capacitor-assets generate --iconBackgroundColor '#0f0f0f' --splashBackgroundColor '#0f0f0f'
-
       - name: Add Capacitor Android platform
         run: |
           [ -d android ] || npx cap add android
           npx cap sync android
+
+      - name: Generate app icons & splash (assets/)
+        run: npx capacitor-assets generate --iconBackgroundColor '#0f0f0f' --splashBackgroundColor '#0f0f0f'
 
       - name: Configure release signing (keystore secrets)
         if: ${{ env.KEYSTORE_BASE64 != '' }}
@@ -105,13 +105,13 @@ jobs:
       - name: Build web app (VITE_API_BASE di-bake ke bundle)
         run: npm run build
 
-      - name: Generate app icons & splash (assets/)
-        run: npx capacitor-assets generate --iconBackgroundColor '#0f0f0f' --splashBackgroundColor '#0f0f0f'
-
       - name: Add Capacitor iOS platform
         run: |
           [ -d ios ] || npx cap add ios
           npx cap sync ios
+
+      - name: Generate app icons & splash (assets/)
+        run: npx capacitor-assets generate --iconBackgroundColor '#0f0f0f' --splashBackgroundColor '#0f0f0f'
 
       - name: Build unsigned .app (simulator)
         working-directory: ios/App
