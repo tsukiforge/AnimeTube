@@ -117,14 +117,7 @@ function VideoMain({ autoNextId }: { autoNextId: string | null }) {
   const [countdown, setCountdown] = useState<number | null>(null);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // Global player (iframe & mini player dikelola di root — lihat GlobalPlayer.tsx)
-  const { showMini, setShowMini, setSuppressed, setVideo, registerPlaceholder } = useGlobalPlayer();
-  const placeholderRef = useRef<HTMLDivElement>(null);
-
-  // Daftarkan placeholder → GlobalPlayer menggambar iframe overlay di atasnya
-  useEffect(() => {
-    registerPlaceholder(placeholderRef.current);
-    return () => registerPlaceholder(null);
-  }, [registerPlaceholder]);
+  const { showMini, setShowMini, setVideo, registerPlaceholder } = useGlobalPlayer();
 
   // Beri tahu GlobalPlayer video yang sedang diputar (judul & id)
   useEffect(() => {
@@ -215,7 +208,8 @@ function VideoMain({ autoNextId }: { autoNextId: string | null }) {
     [],
   );
 
-  if (isLoading) return <div className="aspect-video skeleton rounded-xl" />;
+  if (isLoading)
+    return <div ref={registerPlaceholder} className="aspect-video skeleton rounded-xl" />;
 
   if (!video) {
     return (
@@ -232,7 +226,6 @@ function VideoMain({ autoNextId }: { autoNextId: string | null }) {
   const downloadUrl = `https://yt1s.com/youtube/${v}`;
 
   const activateMini = () => {
-    setSuppressed(true);
     setShowMini(true);
     // Scroll ke bawah agar player keluar viewport
     window.scrollBy({ top: 400, behavior: "smooth" });
@@ -245,7 +238,7 @@ function VideoMain({ autoNextId }: { autoNextId: string | null }) {
           saat scroll keluar / pindah halaman). Placeholder selalu in-flow
           sehingga scroll detection (IntersectionObserver) akurat. */}
       <div
-        ref={placeholderRef}
+        ref={registerPlaceholder}
         className="relative aspect-video overflow-hidden rounded-xl bg-black"
       />
       {!showMini && (

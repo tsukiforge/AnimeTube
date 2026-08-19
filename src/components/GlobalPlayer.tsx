@@ -54,12 +54,20 @@ export function GlobalPlayerProvider({ children }: { children: React.ReactNode }
     placeholderRef.current = el;
     setPlaceholder(el);
     if (!el) {
-      // Keluar dari halaman watch → player otomatis jadi mini & lanjut muter
-      setShowMini(true);
+      if (suppressAuto.current) {
+        // User sudah menutup/minimize-nya → berhenti total, jangan muncul lagi
+        setVideoState(null);
+        setShowMini(false);
+      } else {
+        // Keluar dari halaman watch → player otomatis jadi mini & lanjut muter
+        setShowMini(true);
+      }
     }
   }, []);
 
   const setVideo = useCallback((v: PlayerVideo) => {
+    // Video yang sama (mis. refetch data) → jangan reset status mini/suppress
+    if (videoRef.current?.id === v.id) return;
     setVideoState(v);
     suppressAuto.current = false;
     const el = placeholderRef.current;
@@ -157,7 +165,7 @@ function GlobalPlayer() {
 
   // Default posisi mini player: kanan bawah
   useEffect(() => {
-    setPos({ x: window.innerWidth - 340, y: window.innerHeight - 220 });
+    setPos({ x: Math.max(0, window.innerWidth - 340), y: Math.max(0, window.innerHeight - 220) });
   }, []);
 
   // Clamp posisi saat resize
@@ -200,9 +208,7 @@ function GlobalPlayer() {
       ([entry]) => {
         const visible = entry.isIntersecting || entry.intersectionRatio >= 0.2;
         if (visible) {
-          if (isSuppressed()) {
-            setSuppressed(false);
-          } else if (showMiniRef.current) {
+          if (showMiniRef.current) {
             setShowMini(false);
           }
         } else if (!showMiniRef.current && !isSuppressed() && window.scrollY >= 100) {

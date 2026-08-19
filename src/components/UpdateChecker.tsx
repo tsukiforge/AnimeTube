@@ -4,7 +4,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useReleaseCheck } from "@/hooks/use-release-check";
 import { AlertCircle, Download, ExternalLink, X } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 function getPlatform(): "android" | "ios" | "web" {
   if (!Capacitor.isNativePlatform()) return "web";
@@ -27,7 +27,21 @@ async function openExternal(url: string) {
  */
 export function UpdateChecker() {
   const { release } = useReleaseCheck();
+  const [visible, setVisible] = useState(false);
   const [dismissed, setDismissed] = useState(false);
+  const dismissKey = release ? `animetube-update-dismissed-v${release.version}` : null;
+
+  // Tampilkan hanya SEKALI per versi (localStorage) & muncul setelah beberapa detik,
+  // supaya tidak menghalangi layar begitu aplikasi dibuka.
+  useEffect(() => {
+    if (!release) return;
+    if (localStorage.getItem(dismissKey!) === "1") {
+      setDismissed(true);
+      return;
+    }
+    const t = setTimeout(() => setVisible(true), 4000);
+    return () => clearTimeout(t);
+  }, [release, dismissKey]);
 
   const handleUpdate = useCallback(() => {
     if (!release) return;
@@ -39,12 +53,12 @@ export function UpdateChecker() {
     }
   }, [release]);
 
-  if (!release || dismissed) return null;
+  if (!release || dismissed || !visible) return null;
 
   const platform = getPlatform();
 
   return (
-    <Alert className="fixed bottom-4 left-4 right-4 md:max-w-md md:bottom-8 md:right-8 border-blue-500 bg-blue-50 dark:bg-blue-900/20">
+    <Alert className="fixed bottom-4 left-4 right-4 z-[140] md:max-w-md md:left-8 md:bottom-8 border-blue-500 bg-blue-50 dark:bg-blue-900/20">
       <AlertCircle className="h-4 w-4 text-blue-600" />
       <AlertTitle className="text-blue-900 dark:text-blue-100">
         Update tersedia: v{release.version}
@@ -76,7 +90,10 @@ export function UpdateChecker() {
         <Button
           size="sm"
           variant="ghost"
-          onClick={() => setDismissed(true)}
+          onClick={() => {
+            setDismissed(true);
+            if (dismissKey) localStorage.setItem(dismissKey, "1");
+          }}
           className="text-blue-600 hover:text-blue-700 hover:bg-blue-100/50"
         >
           <X className="h-4 w-4" />
