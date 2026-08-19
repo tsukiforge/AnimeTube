@@ -158,19 +158,29 @@ jobs:
           path: release-assets
           merge-multiple: true
 
-      - name: Determine release tag & create GitHub Release
+      - name: Auto-bump version & create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
           VERSION=$(node -p "require('./package.json').version")
           TAG="v${VERSION}"
-          
-          # Check if tag already exists
+
+          # Auto-bump patch jika tag versi saat ini sudah pernah dirilis
+          # (setiap push ke main = release baru, tanpa edit manual package.json)
           if git rev-parse "$TAG" >/dev/null 2>&1; then
-            echo "Tag $TAG already exists, skipping release creation"
-            exit 0
+            echo "Tag $TAG sudah ada — bump patch version otomatis"
+            npm version patch --no-git-tag-version
+            VERSION=$(node -p "require('./package.json').version")
+            TAG="v${VERSION}"
+            # [skip ci] agar commit bump ini tidak memicu workflow lagi (anti infinite loop)
+            git add package.json package-lock.json
+            git commit -m "[skip ci] chore: bump version to ${TAG}"
+            git push origin HEAD:main
           fi
-          
+
           # Generate changelog dari commits
           PREV=$(git describe --tags --abbrev=0 2>/dev/null || true)
           RANGE=""
@@ -179,7 +189,7 @@ jobs:
           else
             RANGE="HEAD~20..HEAD"
           fi
-          
+
           {
             echo "# AnimeTube v${VERSION}"
             echo ""
@@ -195,11 +205,13 @@ jobs:
             echo "**Android**: Download \`animetube.apk\` and install on your device"
             echo "**Web**: Visit https://animtubev1.vercel.app"
           } > RELEASE_NOTES.md
-          
-          # Create release with proper versioning
+
+          # Tag + push + release
+          git tag "$TAG"
+          git push origin "$TAG"
           gh release create "$TAG" \
             --title "AnimeTube v${VERSION}" \
             --notes-file RELEASE_NOTES.md \
             release-assets/*
-          
+
           echo "Release v${VERSION} created successfully"
