@@ -1,21 +1,28 @@
-import { AlertCircle, Download, ExternalLink, X } from "lucide-react";
-import { useCallback, useState } from "react";
+import { Browser } from "@capacitor/browser";
+import { Capacitor } from "@capacitor/core";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useReleaseCheck } from "@/hooks/use-release-check";
+import { AlertCircle, Download, ExternalLink, X } from "lucide-react";
+import { useCallback, useState } from "react";
 
 function getPlatform(): "android" | "ios" | "web" {
-  const cap = (window as any).Capacitor;
-  if (cap?.getPlatform) {
-    const p = cap.getPlatform();
-    if (p === "android" || p === "ios") return p;
+  if (!Capacitor.isNativePlatform()) return "web";
+  return Capacitor.getPlatform() === "android" ? "android" : "ios";
+}
+
+async function openExternal(url: string) {
+  if (Capacitor.isNativePlatform()) {
+    // Buka browser sistem (butuh @capacitor/browser — window.open("_system") tidak jalan tanpa plugin ini)
+    await Browser.open({ url });
+  } else {
+    window.open(url, "_blank", "noopener");
   }
-  return "web";
 }
 
 /**
- * Auto-update checker — muncul ketika versi baru tersedia di GitHub Release.
- * - Android: buka browser sistem → unduh APK → user install (update "timpang")
+ * Auto-update checker — notifikasi "Update tersedia" saat versi baru dirilis di GitHub.
+ * - Android: buka browser sistem → unduh APK → user install (update/timpa)
  * - iOS/web: buka halaman GitHub Release
  */
 export function UpdateChecker() {
@@ -24,14 +31,11 @@ export function UpdateChecker() {
 
   const handleUpdate = useCallback(() => {
     if (!release) return;
-
     const platform = getPlatform();
-
     if (platform === "android" && release.downloadUrl) {
-      // Buka browser sistem: unduh animetube.apk → prompt install (update/timpa)
-      window.open(release.downloadUrl, "_system");
+      openExternal(release.downloadUrl);
     } else {
-      window.open(release.url, "_blank");
+      openExternal(release.url);
     }
   }, [release]);
 
@@ -48,7 +52,7 @@ export function UpdateChecker() {
       <AlertDescription className="text-blue-800 dark:text-blue-200 text-sm mt-2">
         {platform === "android"
           ? "Versi baru AnimeTube sudah dirilis. Download APK untuk meng-update aplikasi."
-          : "Versi baru AnimeTube sudah dirilis. Update sekarang untuk mendapatkan fitur terbaru dan perbaikan bug."}
+          : "Versi baru AnimeTube sudah dirilis. Lihat release untuk mendapatkan fitur terbaru."}
       </AlertDescription>
       <div className="flex gap-2 mt-3">
         <Button

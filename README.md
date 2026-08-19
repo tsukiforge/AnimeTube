@@ -8,6 +8,20 @@ URL produksi: **[https://animtubev1.vercel.app](https://animtubev1.vercel.app)**
 
 ---
 
+## 📱 Panduan Install (untuk pengguna)
+
+> **Paling gampang — tanpa install apa-apa:** buka [https://animtubev1.vercel.app](https://animtubev1.vercel.app) di browser HP (Safari/Chrome) → _Bagikan_ → _Tambahkan ke Layar Utama_. Semua fitur sama persis dengan versi aplikasi.
+>
+> **Mau versi aplikasi sungguhan?** Panduan lengkap + santai (bahasa manusia) ada di **[📖 Wiki AnimeTube](https://github.com/tsukiforge/AnimeTube/wiki)**:
+>
+> - [Install di iPhone (iOS)](https://github.com/tsukiforge/AnimeTube/wiki/Instalasi-iPhone) — langkah demi langkah pakai Sideloadly/AltStore
+> - [Install di Android](https://github.com/tsukiforge/AnimeTube/wiki/Instalasi-Android) — download APK, langsung pasang
+> - [FAQ](https://github.com/tsukiforge/AnimeTube/wiki/FAQ) — jawaban cepat
+
+File aplikasi terbaru selalu di **[halaman Release](https://github.com/tsukiforge/AnimeTube/releases)**.
+
+---
+
 ## 🧭 Apa Tujuan Proyek Ini?
 
 Proyek ini dibuat untuk memberikan pengalaman **menjelajah video anime yang bebas, modern, dan aman**, tanpa harus login ke akun YouTube:
@@ -37,9 +51,11 @@ Kami tidak memiliki kontrol atas apa yang diunggah oleh pembuat konten di YouTub
 AnimeTube bisa dijalankan sebagai aplikasi Android & iOS berkat [Capacitor](https://capacitorjs.com):
 
 - **Build otomatis di GitHub Actions** — setiap push ke `main` menghasilkan:
-  - `animetube.apk` — APK release Android (ditandatangani jika secret keystore diset)
+  - `animetube.apk` — APK release Android (install langsung di HP)
   - `animetube-release.aab` — bundle Android untuk Play Store
-  - `animetube-ios.app.zip` — aplikasi iOS (unsigned, untuk simulator)
+  - `animetube-ios.ipa` — aplikasi iOS untuk perangkat asli (sideload via Sideloadly/AltStore, lihat [Wiki](https://github.com/tsukiforge/AnimeTube/wiki/Instalasi-iPhone))
+  - `animetube-ios.app.zip` — aplikasi iOS untuk Xcode Simulator
+- **Notifikasi update di dalam app** — saat versi baru rilis, muncul notifikasi "Update tersedia" → langsung unduh (Android) / buka halaman release (iOS).
 - **GitHub Release** — semua artifact di-upload otomatis ke Release berserta changelog dari commit terbaru.
 - **API endpoint** — aplikasi mobile memakai `VITE_API_BASE` (default `https://animtubev1.vercel.app`) sebagai backend proxy; tidak perlu key YouTube di perangkat.
 
@@ -70,10 +86,10 @@ Buka `http://localhost:5173` di browser.
 
 ## 🔧 Konfigurasi
 
-| Variabel | Kegunaan | Dimana |
-| --- | --- | --- |
-| `YOUTUBE_API_KEY` | API key YouTube Data API v3 | `.env` lokal / Vercel Environment Variables |
-| `VITE_API_BASE` | Base URL API proxy untuk aplikasi mobile | GitHub Repository Variable (Actions) |
+| Variabel          | Kegunaan                                 | Dimana                                      |
+| ----------------- | ---------------------------------------- | ------------------------------------------- |
+| `YOUTUBE_API_KEY` | API key YouTube Data API v3              | `.env` lokal / Vercel Environment Variables |
+| `VITE_API_BASE`   | Base URL API proxy untuk aplikasi mobile | GitHub Repository Variable (Actions)        |
 
 - **Di lokal**: proxy API berjalan di server Vite (`/api/youtube`), jadi key tidak pernah bocor ke browser.
 - **Di produksi (Vercel)**: proxy berjalan sebagai serverless function (`api/youtube.ts`).
