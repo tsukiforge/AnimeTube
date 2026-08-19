@@ -91,7 +91,7 @@ jobs:
           if-no-files-found: error
 
   ios:
-    name: iOS (unsigned, simulator)
+    name: iOS (unsigned, .ipa + simulator)
     runs-on: macos-latest
     timeout-minutes: 40
     steps:
@@ -119,6 +119,32 @@ jobs:
       - name: Generate app icons & splash (assets/)
         run: npx capacitor-assets generate --iconBackgroundColor '#0f0f0f' --splashBackgroundColor '#0f0f0f'
 
+      - name: Build unsigned .ipa (device, untuk sideload)
+        working-directory: ios/App
+        run: |
+          xcodebuild \
+            -project App.xcodeproj \
+            -scheme App \
+            -configuration Debug \
+            -sdk iphoneos \
+            -derivedDataPath build-device \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Package .ipa (Payload/App.app)
+        working-directory: ios/App/build-device/Build/Products/Debug-iphoneos
+        run: |
+          mkdir -p Payload
+          cp -R App.app Payload/
+          zip -r animetube-ios.ipa Payload
+
+      - name: Upload iOS .ipa (untuk Sideloadly/AltStore)
+        uses: actions/upload-artifact@v4
+        with:
+          name: animetube-ios.ipa
+          path: ios/App/build-device/Build/Products/Debug-iphoneos/animetube-ios.ipa
+          if-no-files-found: error
+
       - name: Build unsigned .app (simulator)
         working-directory: ios/App
         run: |
@@ -135,7 +161,7 @@ jobs:
         working-directory: ios/App/build/Build/Products/Debug-iphonesimulator
         run: zip -r animetube-ios.app.zip App.app
 
-      - name: Upload iOS app
+      - name: Upload iOS simulator app
         uses: actions/upload-artifact@v4
         with:
           name: animetube-ios
@@ -204,7 +230,8 @@ jobs:
             echo ""
             echo "## 📥 Downloads"
             echo "- **APK (Android)**: Download from release assets or install directly"
-            echo "- **iOS**: Available for simulator testing"
+            echo "- **iOS (.ipa)**: Sideload \`animetube-ios.ipa\` via Sideloadly/AltStore (Apple ID gratis, re-sign tiap 7 hari)"
+            echo "- **iOS (simulator)**: \`animetube-ios.app.zip\` untuk Xcode Simulator"
             echo ""
             echo "## 📝 Changelog"
             echo ""
