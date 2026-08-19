@@ -38,17 +38,27 @@ function ContinueWatching() {
     <section className="mb-6">
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-base font-semibold text-foreground">Lanjutkan menonton</h2>
-        <button onClick={clear} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+        <button
+          onClick={clear}
+          className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+        >
           Hapus riwayat
         </button>
       </div>
       <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollbarWidth: "none" }}>
         {items.slice(0, 10).map((it) => (
           <Link key={it.id} to="/watch" search={{ v: it.id }} className="group shrink-0 w-48">
-            <div className="relative overflow-hidden rounded-xl bg-[#272727]" style={{ aspectRatio: "16/9" }}>
+            <div
+              className="relative overflow-hidden rounded-xl bg-surface dark:bg-[#272727]"
+              style={{ aspectRatio: "16/9" }}
+            >
               {it.thumb && (
-                <img src={it.thumb} alt="" loading="lazy"
-                  className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                <img
+                  src={it.thumb}
+                  alt=""
+                  loading="lazy"
+                  className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
+                />
               )}
             </div>
             <p className="mt-1.5 line-clamp-2 text-xs font-medium text-foreground">{it.title}</p>
@@ -60,7 +70,7 @@ function ContinueWatching() {
   );
 }
 
-function VideoFeed({ activeChip }: { activeChip: typeof CHIPS[0] }) {
+function VideoFeed({ activeChip }: { activeChip: (typeof CHIPS)[0] }) {
   const infiniteResult = useInfiniteQuery({
     queryKey: ["home-feed", activeChip.q],
     queryFn: ({ pageParam }) =>
@@ -74,17 +84,27 @@ function VideoFeed({ activeChip }: { activeChip: typeof CHIPS[0] }) {
   const allItems = data?.pages.flatMap((p: any) => p.items) ?? [];
 
   return (
-    <InfiniteScroll onLoadMore={() => fetchNextPage()} hasMore={!!hasNextPage} loading={isFetchingNextPage}>
+    <InfiniteScroll
+      onLoadMore={() => fetchNextPage()}
+      hasMore={!!hasNextPage}
+      loading={isFetchingNextPage}
+    >
       <div className="grid gap-x-4 gap-y-8 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
         {isLoading
           ? Array.from({ length: 20 }).map((_, i) => <SkeletonCard key={i} index={i} />)
           : allItems.flatMap((v: any, i: number) => {
               const card = <VideoCard key={v.id + i} video={v} />;
               if (i > 0 && i % 12 === 0)
-                return [card, <div key={"ad" + i} className="col-span-full"><AdSlot id={`ad-home-${i}`} size="leaderboard" /></div>];
+                return [
+                  card,
+                  <div key={"ad" + i} className="col-span-full">
+                    <AdSlot id={`ad-home-${i}`} size="leaderboard" />
+                  </div>,
+                ];
               return [card];
             })}
-        {isFetchingNextPage && Array.from({ length: 8 }).map((_, i) => <SkeletonCard key={"sk" + i} index={i} />)}
+        {isFetchingNextPage &&
+          Array.from({ length: 8 }).map((_, i) => <SkeletonCard key={"sk" + i} index={i} />)}
       </div>
     </InfiniteScroll>
   );
@@ -94,7 +114,10 @@ function HomePage() {
   const [activeChip, setActiveChip] = useState(CHIPS[0]);
 
   useSeo({
-    title: activeChip.label === "Semua" ? "Nonton Anime Gratis Tanpa Login" : `Anime ${activeChip.label} — Koleksi Terbaru`,
+    title:
+      activeChip.label === "Semua"
+        ? "Nonton Anime Gratis Tanpa Login"
+        : `Anime ${activeChip.label} — Koleksi Terbaru`,
     description:
       activeChip.label === "Semua"
         ? "Nonton video anime gratis tanpa login. Trending, Shorts, Live, dan ratusan genre anime lainnya. Diperbarui setiap hari."
@@ -110,7 +133,10 @@ function HomePage() {
         <main className="flex-1 min-w-0">
           {/* Genre chips — sticky below navbar */}
           <div className="sticky top-14 z-40 bg-background border-b border-border">
-            <div className="flex gap-2 px-4 py-2 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+            <div
+              className="flex gap-2 px-4 py-2 overflow-x-auto"
+              style={{ scrollbarWidth: "none" }}
+            >
               {CHIPS.map((chip) => (
                 <button
                   key={chip.label}

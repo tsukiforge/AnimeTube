@@ -1,5 +1,6 @@
 import { AdblockDetector } from "@/components/AdblockDetector";
 import { DisclaimerModal } from "@/components/DisclaimerModal";
+import { GlobalPlayerProvider } from "@/components/GlobalPlayer";
 import { OfflineScreen } from "@/components/OfflineScreen";
 import { UpdateChecker } from "@/components/UpdateChecker";
 import { Toaster } from "@/components/ui/sonner";
@@ -13,8 +14,13 @@ function NotFoundComponent() {
       <div className="max-w-md text-center">
         <h1 className="font-display text-8xl font-black text-gradient">404</h1>
         <h2 className="mt-4 font-display text-2xl font-bold">Senpai... this page doesn't exist</h2>
-        <p className="mt-2 text-sm text-muted-foreground">The episode you're looking for isn't in the archive.</p>
-        <Link to="/" className="mt-6 inline-flex items-center justify-center rounded-full bg-[var(--gradient-primary)] px-6 py-2.5 text-sm font-bold text-white shadow-[var(--shadow-glow)]">
+        <p className="mt-2 text-sm text-muted-foreground">
+          The episode you're looking for isn't in the archive.
+        </p>
+        <Link
+          to="/"
+          className="mt-6 inline-flex items-center justify-center rounded-full bg-[var(--gradient-primary)] px-6 py-2.5 text-sm font-bold text-white shadow-[var(--shadow-glow)]"
+        >
           ▶ Back home
         </Link>
       </div>
@@ -33,9 +39,14 @@ function ErrorComponent({ error }: { error: Error }) {
           {quota ? "API-chan is tired!" : "Something broke"}
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          {quota ? "We've hit the YouTube quota for now. Come back later." : error?.message || "Unknown error"}
+          {quota
+            ? "We've hit the YouTube quota for now. Come back later."
+            : error?.message || "Unknown error"}
         </p>
-        <Link to="/" className="mt-6 inline-flex rounded-full bg-[var(--gradient-primary)] px-6 py-2.5 text-sm font-bold text-white shadow-[var(--shadow-glow)]">
+        <Link
+          to="/"
+          className="mt-6 inline-flex rounded-full bg-[var(--gradient-primary)] px-6 py-2.5 text-sm font-bold text-white shadow-[var(--shadow-glow)]"
+        >
           Go home
         </Link>
       </div>
@@ -52,13 +63,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 function RootComponent() {
   useSessionTimer();
   return (
-    <>
+    <GlobalPlayerProvider>
       <OfflineScreen />
       <AdblockDetector />
       <DisclaimerModal />
       <UpdateChecker />
       <Toaster position="bottom-right" richColors closeButton />
       <Outlet />
-    </>
+    </GlobalPlayerProvider>
   );
 }

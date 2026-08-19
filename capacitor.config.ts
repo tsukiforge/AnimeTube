@@ -1,6 +1,6 @@
 import type { CapacitorConfig } from "@capacitor/cli";
 
-const pkg = require('./package.json');
+const pkg = require("./package.json");
 
 const config: CapacitorConfig = {
   appId: "com.animetube.app",
@@ -12,7 +12,10 @@ const config: CapacitorConfig = {
   },
   plugins: {
     SplashScreen: {
-      launchShowDuration: 0,
+      launchShowDuration: 2500,
+      showSpinner: false,
+      splashImmersive: true,
+      backgroundColor: "#0f0f0f",
     },
   },
 };

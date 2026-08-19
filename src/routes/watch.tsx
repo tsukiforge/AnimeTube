@@ -1,5 +1,6 @@
 import { AdSlot } from "@/components/AdSlot";
 import { Equalizer } from "@/components/Equalizer";
+import { useGlobalPlayer } from "@/components/GlobalPlayer";
 import { Navbar } from "@/components/Navbar";
 import { Sidebar } from "@/components/Sidebar";
 import { SkeletonCard } from "@/components/SkeletonCard";
@@ -12,7 +13,7 @@ import { useSeo } from "@/lib/seo";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
 import { fallback, zodValidator } from "@tanstack/zod-adapter";
-import { Maximize2, Minimize2, X as XIcon } from "lucide-react";
+import { Minimize2 } from "lucide-react";
 import { Component, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -61,72 +62,6 @@ class SectionErrorBoundary extends Component<
     }
     return this.props.children;
   }
-}
-
-// ── Mini Player (PiP) ─────────────────────────────────────────────
-// TIDAK pakai portal/duplikat: container player utama sendiri yang berubah
-// jadi fixed bottom-right via CSS saat showMini. Iframe TIDAK pernah
-// di-unmount/dipindah → posisi waktu & state player 100% sinkron tanpa reload.
-// (VideoFrame & player main) — lihat VideoMain.
-
-// Single iframe YouTube player — SATU instance untuk player utama & miniplayer.
-// Dirender di main slot, lalu di-portal ke MiniPlayer tanpa remount.
-function VideoFrame({
-  videoId,
-  title,
-  playerError,
-  onRetry,
-}: {
-  videoId: string;
-  title: string;
-  playerError: boolean;
-  onRetry: () => void;
-}) {
-  // origin param hanya untuk http(s) — di WebView (capacitor://localhost) di-omit
-  const isHttpOrigin = /^https?:\/\//.test(window.location.origin);
-  const jsapiParam = isHttpOrigin
-    ? `&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`
-    : "&enablejsapi=1";
-  const ytWatchUrl = `https://www.youtube.com/watch?v=${videoId}`;
-
-  return (
-    <>
-      <iframe
-        src={`https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&iv_load_policy=3&controls=1&playsinline=1${jsapiParam}`}
-        title={title}
-        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-        allowFullScreen
-        referrerPolicy="strict-origin-when-cross-origin"
-        className="absolute inset-0 h-full w-full border-0"
-      />
-      {playerError && (
-        <div className="absolute inset-0 z-10 grid place-items-center bg-black">
-          <div className="px-4 text-center">
-            <p className="mb-1 text-sm font-semibold text-white">Video tidak dapat diputar</p>
-            <p className="mb-4 text-xs text-white/60">
-              Video ini tidak mengizinkan diputar di situs lain (embedding dinonaktifkan).
-            </p>
-            <div className="flex justify-center gap-2">
-              <a
-                href={ytWatchUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="rounded-full bg-primary px-4 py-2 text-xs font-bold text-primary-foreground hover:opacity-90 transition-opacity"
-              >
-                Tonton di YouTube
-              </a>
-              <button
-                onClick={onRetry}
-                className="rounded-full border border-border bg-surface px-4 py-2 text-xs font-bold text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Coba lagi
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
-  );
 }
 
 function ActionButton({
@@ -181,60 +116,20 @@ function VideoMain({ autoNextId }: { autoNextId: string | null }) {
   });
   const [countdown, setCountdown] = useState<number | null>(null);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const [showMini, setShowMini] = useState(false);
-  const [playerError, setPlayerError] = useState(false);
-  const [playerAttempt, setPlayerAttempt] = useState(0);
-  const playerRef = useRef<HTMLDivElement>(null);
-  // Mini player CSS-fixed: posisi & drag (iframe tidak pernah dipindah DOM)
-  const [pos, setPos] = useState({ x: 0, y: 0 });
-  const [dragging, setDragging] = useState(false);
-  const dragStart = useRef({ mx: 0, my: 0, px: 0, py: 0 });
-  const showMiniRef = useRef(false);
-  showMiniRef.current = showMini;
-  // Setelah manual close/expand, jangan auto-reopen sampai player terlihat lagi
-  const suppressAuto = useRef(false);
+  // Global player (iframe & mini player dikelola di root — lihat GlobalPlayer.tsx)
+  const { showMini, setShowMini, setSuppressed, setVideo, registerPlaceholder } = useGlobalPlayer();
+  const placeholderRef = useRef<HTMLDivElement>(null);
 
-  // Default posisi mini player: bottom-right
+  // Daftarkan placeholder → GlobalPlayer menggambar iframe overlay di atasnya
   useEffect(() => {
-    const w = window.innerWidth;
-    const h = window.innerHeight;
-    setPos({ x: w - 340, y: h - 220 });
-  }, []);
+    registerPlaceholder(placeholderRef.current);
+    return () => registerPlaceholder(null);
+  }, [registerPlaceholder]);
 
-  const closeMini = () => {
-    suppressAuto.current = true;
-    setShowMini(false);
-  };
-
-  const expandMini = () => {
-    suppressAuto.current = true;
-    setShowMini(false);
-    playerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-  };
-
-  const onDragStart = (e: React.PointerEvent) => {
-    setDragging(true);
-    dragStart.current = { mx: e.clientX, my: e.clientY, px: pos.x, py: pos.y };
-  };
-
+  // Beri tahu GlobalPlayer video yang sedang diputar (judul & id)
   useEffect(() => {
-    if (!dragging) return;
-    const onMove = (e: PointerEvent) => {
-      const dx = e.clientX - dragStart.current.mx;
-      const dy = e.clientY - dragStart.current.my;
-      setPos({
-        x: Math.max(0, Math.min(window.innerWidth - 320, dragStart.current.px + dx)),
-        y: Math.max(0, Math.min(window.innerHeight - 200, dragStart.current.py + dy)),
-      });
-    };
-    const onUp = () => setDragging(false);
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-    return () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-    };
-  }, [dragging]);
+    if (video) setVideo({ id: v, title: video.snippet.title });
+  }, [v, video, setVideo]);
 
   // ── Watch timer — health reminder after 5h ────────────────────
   const handleHealthToast = useCallback(
@@ -265,43 +160,14 @@ function VideoMain({ autoNextId }: { autoNextId: string | null }) {
     });
   }, [v, video]);
 
-  // Reset state player saat pindah video
-  useEffect(() => {
-    setPlayerError(false);
-    setPlayerAttempt(0);
-  }, [v]);
-
-  // ── Keyboard shortcuts ────────────────────────────────────────
+  // Escape = batal countdown auto-next
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      // Ignore when typing in input/textarea
-      const tag = (e.target as HTMLElement)?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
-
-      switch (e.key.toLowerCase()) {
-        case "m":
-          // Toggle mini player
-          if (showMini) {
-            closeMini();
-            toast("Mini player dinonaktifkan", { duration: 1500 });
-          } else {
-            setShowMini(true);
-            toast("Mini player aktif", { duration: 1500 });
-          }
-          break;
-        case "escape":
-          if (showMini) {
-            closeMini();
-          }
-          if (countdown !== null) {
-            cancelCountdown();
-          }
-          break;
-      }
+      if (e.key === "Escape" && countdown !== null) cancelCountdown();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [showMini, countdown]);
+  }, [countdown]);
 
   // Listen for YouTube iframe postMessage — detect video ended or player error
   useEffect(() => {
@@ -314,11 +180,9 @@ function VideoMain({ autoNextId }: { autoNextId: string | null }) {
         if (data?.event === "infoDelivery" && data?.info?.playerState === 0) {
           if (autoNextId) startCountdown(autoNextId);
         }
-        // Player gagal dimuat (video tidak boleh di-embed, Error 153, dll)
-        if (data?.event === "onError") {
-          setPlayerError(true);
-        }
-      } catch {}
+      } catch {
+        // abaikan pesan non-JSON / bukan format YT iframe API
+      }
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
@@ -351,27 +215,6 @@ function VideoMain({ autoNextId }: { autoNextId: string | null }) {
     [],
   );
 
-  // Scroll detection — show mini player when video scrolls out of view.
-  // Guard: jangan auto-muncul saat first-load (belum scroll), jangan override
-  // saat mini aktif, dan hormati suppressAuto setelah user manual close.
-  useEffect(() => {
-    if (!playerRef.current) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (showMiniRef.current) return;
-        if (entry.isIntersecting || entry.intersectionRatio >= 0.2) {
-          suppressAuto.current = false;
-          setShowMini(false);
-        } else if (!suppressAuto.current && window.scrollY >= 100) {
-          setShowMini(true);
-        }
-      },
-      { threshold: [0, 0.2] },
-    );
-    observer.observe(playerRef.current);
-    return () => observer.disconnect();
-  }, [video]);
-
   if (isLoading) return <div className="aspect-video skeleton rounded-xl" />;
 
   if (!video) {
@@ -388,87 +231,38 @@ function VideoMain({ autoNextId }: { autoNextId: string | null }) {
   const ytWatchUrl = `https://www.youtube.com/watch?v=${v}`;
   const downloadUrl = `https://yt1s.com/youtube/${v}`;
 
-  // SATU instance player — dirender di main slot, di-portal ke MiniPlayer saat scroll.
-  // Iframe yang sama → posisi & state player identik (bukan duplikat seperti sebelumnya).
-  const playerFrame = (
-    <VideoFrame
-      key={`${v}-${playerAttempt}`}
-      videoId={v}
-      title={video.snippet.title}
-      playerError={playerError}
-      onRetry={() => {
-        setPlayerError(false);
-        setPlayerAttempt((n) => n + 1);
-      }}
-    />
-  );
+  const activateMini = () => {
+    setSuppressed(true);
+    setShowMini(true);
+    // Scroll ke bawah agar player keluar viewport
+    window.scrollBy({ top: 400, behavior: "smooth" });
+  };
 
   return (
     <div>
-      {/* SATU container player — iframe TIDAK pernah unmount/pindah DOM.
-          Saat showMini, container ini yang berubah jadi fixed bottom-right (CSS),
-          jadi video lanjut muter tanpa reload/error. */}
+      {/* Placeholder player utama — iframe asli digambar oleh GlobalPlayer
+          (overlay absolute di posisi ini saat normal, atau fixed mini player
+          saat scroll keluar / pindah halaman). Placeholder selalu in-flow
+          sehingga scroll detection (IntersectionObserver) akurat. */}
       <div
-        ref={playerRef}
-        className={
-          showMini
-            ? "fixed z-[150] overflow-hidden rounded-xl border border-border shadow-2xl bg-black"
-            : "overflow-hidden rounded-xl"
-        }
-        style={
-          showMini
-            ? { left: pos.x, top: pos.y, width: 320, cursor: dragging ? "grabbing" : "grab" }
-            : undefined
-        }
-      >
-        {showMini && (
-          <div
-            className="flex items-center justify-between bg-[#1f1f1f] px-2 py-1.5 select-none touch-none"
-            onPointerDown={onDragStart}
+        ref={placeholderRef}
+        className="relative aspect-video overflow-hidden rounded-xl bg-black"
+      />
+      {!showMini && (
+        <div className="flex items-center justify-between bg-surface dark:bg-[#1f1f1f] px-3 py-1.5 rounded-b-xl border border-t-0 border-border">
+          <span className="text-[11px] text-muted-foreground">
+            Mini player — klik untuk aktifkan atau scroll ke bawah
+          </span>
+          <button
+            onClick={activateMini}
+            className="flex items-center gap-1.5 rounded px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground hover:bg-surface transition-colors"
+            title="Aktifkan Mini Player"
           >
-            <p className="text-[11px] text-muted-foreground truncate flex-1 mr-2">
-              {video.snippet.title}
-            </p>
-            <div className="flex items-center gap-1 shrink-0">
-              <button
-                onClick={expandMini}
-                className="grid h-6 w-6 place-items-center rounded text-muted-foreground hover:text-foreground hover:bg-surface transition-colors"
-                title="Perbesar"
-              >
-                <Maximize2 size={12} />
-              </button>
-              <button
-                onClick={closeMini}
-                className="grid h-6 w-6 place-items-center rounded text-muted-foreground hover:text-foreground hover:bg-surface transition-colors"
-                title="Tutup"
-              >
-                <XIcon size={12} />
-              </button>
-            </div>
-          </div>
-        )}
-        <div className="relative aspect-video bg-black">{playerFrame}</div>
-        {!showMini && (
-          <div className="flex items-center justify-between bg-[#1f1f1f] px-3 py-1.5">
-            <span className="text-[11px] text-muted-foreground">
-              Mini player — klik untuk aktifkan atau scroll ke bawah
-            </span>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowMini(true);
-                // Scroll ke bawah agar player keluar viewport
-                window.scrollBy({ top: 400, behavior: "smooth" });
-              }}
-              className="flex items-center gap-1.5 rounded px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground hover:bg-surface transition-colors"
-              title="Aktifkan Mini Player"
-            >
-              <Minimize2 size={13} />
-              <span>Mini Player</span>
-            </button>
-          </div>
-        )}
-      </div>
+            <Minimize2 size={13} />
+            <span>Mini Player</span>
+          </button>
+        </div>
+      )}
 
       {/* Auto-next countdown banner */}
       {countdown !== null && autoNextId && (
@@ -749,7 +543,18 @@ function Related({ onFirstVideo }: { onFirstVideo?: (id: string) => void }) {
 
 function WatchPage() {
   const { v } = Route.useSearch();
+  const navigate = useNavigate();
   const [nextVideoId, setNextVideoId] = useState<string | null>(null);
+
+  // Back (browser/hardware) dari halaman watch → selalu ke beranda,
+  // bukan ke halaman sebelumnya (search/channel/dll). Mini player tetap lanjut.
+  useEffect(() => {
+    const onPop = () => {
+      navigate({ to: "/", replace: true });
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [navigate]);
 
   if (!v) {
     return (

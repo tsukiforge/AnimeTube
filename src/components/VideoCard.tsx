@@ -24,7 +24,16 @@ function ChannelAvatar({ name, src }: { name: string; src?: string }) {
   const [err, setErr] = useState(false);
   const letter = name?.[0]?.toUpperCase() || "A";
   // Generate consistent color from name
-  const colors = ["#ff0000","#ff6b35","#f7c59f","#efefd0","#004e89","#1a936f","#88d498","#c6dabf"];
+  const colors = [
+    "#ff0000",
+    "#ff6b35",
+    "#f7c59f",
+    "#efefd0",
+    "#004e89",
+    "#1a936f",
+    "#88d498",
+    "#c6dabf",
+  ];
   const color = colors[name.charCodeAt(0) % colors.length];
 
   if (src && !err) {
@@ -75,7 +84,13 @@ function DurationBadge({ video }: { video: YTVideo }) {
   );
 }
 
-export function VideoCard({ video, variant = "grid" }: { video: YTVideo; variant?: "grid" | "compact" }) {
+export function VideoCard({
+  video,
+  variant = "grid",
+}: {
+  video: YTVideo;
+  variant?: "grid" | "compact";
+}) {
   const id = typeof video.id === "string" ? video.id : (video as any).id?.videoId;
   const thumb =
     video.snippet.thumbnails?.maxres?.url ||
@@ -87,7 +102,9 @@ export function VideoCard({ video, variant = "grid" }: { video: YTVideo; variant
     video.snippet?.liveBroadcastContent !== "live" &&
     durationSeconds(video.contentDetails?.duration) > 0 &&
     durationSeconds(video.contentDetails?.duration) < 60;
-  const target = isShort ? { to: "/shorts" as const, search: { v: id } } : { to: "/watch" as const, search: { v: id } };
+  const target = isShort
+    ? { to: "/shorts" as const, search: { v: id } }
+    : { to: "/watch" as const, search: { v: id } };
 
   if (variant === "compact") {
     return (
@@ -96,7 +113,10 @@ export function VideoCard({ video, variant = "grid" }: { video: YTVideo; variant
         search={target.search}
         className="group flex gap-2 rounded-lg p-2 hover:bg-surface transition-colors"
       >
-        <div className="relative w-[168px] shrink-0 overflow-hidden rounded-lg bg-[#272727]" style={{ aspectRatio: "16/9" }}>
+        <div
+          className="relative w-[168px] shrink-0 overflow-hidden rounded-lg bg-surface dark:bg-[#272727]"
+          style={{ aspectRatio: "16/9" }}
+        >
           {thumb && <Thumb src={thumb} alt={video.snippet.title} />}
           <DurationBadge video={video} />
         </div>
@@ -114,14 +134,10 @@ export function VideoCard({ video, variant = "grid" }: { video: YTVideo; variant
   }
 
   return (
-    <Link
-      to={target.to}
-      search={target.search}
-      className="group block"
-    >
+    <Link to={target.to} search={target.search} className="group block">
       {/* Thumbnail */}
       <div
-        className="relative w-full overflow-hidden rounded-xl bg-[#272727]"
+        className="relative w-full overflow-hidden rounded-xl bg-surface dark:bg-[#272727]"
         style={{ aspectRatio: "16/9" }}
       >
         {thumb && <Thumb src={thumb} alt={video.snippet.title} />}

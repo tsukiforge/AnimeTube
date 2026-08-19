@@ -50,6 +50,9 @@ jobs:
           [ -d android ] || npx cap add android
           npx cap sync android
 
+      - name: Patch native permissions (voice search / mic)
+        run: node scripts/apply-native-permissions.mjs
+
       - name: Generate app icons & splash (assets/)
         run: npx capacitor-assets generate --iconBackgroundColor '#0f0f0f' --splashBackgroundColor '#0f0f0f'
 
@@ -110,6 +113,9 @@ jobs:
           [ -d ios ] || npx cap add ios
           npx cap sync ios
 
+      - name: Patch native permissions (voice search / mic)
+        run: node scripts/apply-native-permissions.mjs
+
       - name: Generate app icons & splash (assets/)
         run: npx capacitor-assets generate --iconBackgroundColor '#0f0f0f' --splashBackgroundColor '#0f0f0f'
 
@@ -162,8 +168,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Commit bump atas nama author commit yang memicu workflow (bukan bot)
+          AUTHOR_NAME=$(git log -1 --format='%an')
+          AUTHOR_EMAIL=$(git log -1 --format='%ae')
+          git config user.name "$AUTHOR_NAME"
+          git config user.email "$AUTHOR_EMAIL"
 
           VERSION=$(node -p "require('./package.json').version")
           TAG="v${VERSION}"
