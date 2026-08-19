@@ -228,18 +228,22 @@ jobs:
           {
             echo "# AnimeTube v${VERSION}"
             echo ""
+            echo "[🌐 Web App](https://animtubev1.vercel.app) · [📱 Android APK](https://github.com/tsukiforge/AnimeTube/releases/download/${TAG}/animetube.apk) · [🍎 iOS .ipa](https://github.com/tsukiforge/AnimeTube/releases/download/${TAG}/animetube-ios.ipa)"
+            echo ""
             echo "## 📥 Downloads"
-            echo "- **APK (Android)**: Download from release assets or install directly"
-            echo "- **iOS (.ipa)**: Sideload \`animetube-ios.ipa\` via Sideloadly/AltStore (Apple ID gratis, re-sign tiap 7 hari)"
+            echo "- **Android**: \`animetube.apk\` — install langsung di HP (izin install dari sumber tidak dikenal)"
+            echo "- **Android (Play Store)**: \`animetube-release.aab\`"
+            echo "- **iOS (.ipa)**: Sideload via Sideloadly/AltStore (Apple ID gratis, re-sign tiap 7 hari)"
             echo "- **iOS (simulator)**: \`animetube-ios.app.zip\` untuk Xcode Simulator"
             echo ""
             echo "## 📝 Changelog"
             echo ""
-            git log --oneline --no-merges "$RANGE" 2>/dev/null | sed 's/^/- /' || echo "- Initial release"
+            git log --oneline --no-merges "$RANGE" 2>/dev/null | grep -v "\[skip ci\]" | sed 's/^/- /' || echo "- Initial release"
             echo ""
             echo "## 🚀 Installation"
-            echo "**Android**: Download \`animetube.apk\` and install on your device"
-            echo "**Web**: Visit https://animtubev1.vercel.app"
+            echo "**Android**: Download \`animetube.apk\` dan install (izinkan *unknown sources*)."
+            echo "**iOS**: Lihat panduan sideload di README."
+            echo "**Web**: Kunjungi https://animtubev1.vercel.app"
           } > RELEASE_NOTES.md
 
           # Tag + push + release
