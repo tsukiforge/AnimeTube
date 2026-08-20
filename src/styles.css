@@ -330,8 +330,6 @@
 [data-yt-player] iframe {
   position: absolute;
   inset: 0;
-  width: 100% !important;
-  height: 100% !important;
   border: 0;
 }
 :fullscreen {

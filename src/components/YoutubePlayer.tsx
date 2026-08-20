@@ -1,6 +1,6 @@
 import { ensureYouTubeApi } from "@/lib/youtube-iframe-api";
 import { ExternalLink, Maximize, Minimize, Pause, Play, Volume2, VolumeX } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type ControlsMode = "full" | "minimal" | "none";
 
@@ -29,6 +29,7 @@ function formatTime(sec: number): string {
 // fullscreen — tanpa logo & setting bawaan YouTube.
 export function YoutubePlayer({
   videoId,
+  title,
   autoPlay = true,
   controls = "full",
   onEnded,
@@ -100,6 +101,7 @@ export function YoutubePlayer({
             }
             setReady(true);
             onReadyRef.current?.(player);
+            sizePlayer();
           },
           onStateChange: (e) => {
             setPlaying(e.data === YT.PlayerState.PLAYING);
@@ -135,6 +137,37 @@ export function YoutubePlayer({
     }, 500);
     return () => clearInterval(t);
   }, [ready]);
+
+  // Atur ulang ukuran iframe YouTube saat wadahnya berubah ukuran
+  // (mis. overlay besar → mini player). Tanpa ini video bisa tampil
+  // hitam padahal suaranya jalan.
+  const sizePlayer = useCallback(() => {
+    const p = playerRef.current;
+    const el = wrapRef.current;
+    if (!p || !el) return;
+    try {
+      const w = el.clientWidth;
+      const h = el.clientHeight;
+      if (w > 0 && h > 0) {
+        p.setSize(w, h);
+        // Paksa repaint agar permukaan video ikut ter-remake setelah resize
+        const iframe = p.getIframe();
+        iframe.style.transform = "translateZ(0)";
+        void iframe.offsetWidth;
+        iframe.style.transform = "";
+      }
+    } catch {
+      // abaikan — player belum siap
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!ready) return;
+    const ro = new ResizeObserver(() => sizePlayer());
+    if (wrapRef.current) ro.observe(wrapRef.current);
+    sizePlayer();
+    return () => ro.disconnect();
+  }, [ready, sizePlayer]);
 
   // Auto-hide kontrol saat diputar (muncul lagi saat gerakan mouse/sentuh)
   useEffect(() => {
@@ -225,6 +258,13 @@ export function YoutubePlayer({
       className={`relative overflow-hidden bg-black ${className ?? ""}`}
     >
       <div ref={containerRef} className="absolute inset-0" />
+
+      {/* Chip judul kiri-atas — sekaligus menutup logo YouTube */}
+      {title && controls !== "none" && !error && (
+        <div className="pointer-events-none absolute left-2 top-2 z-20 max-w-[70%] truncate rounded bg-black/60 px-2 py-1 text-[10px] font-medium text-white/90 backdrop-blur-sm">
+          {title}
+        </div>
+      )}
 
       {/* Error — video tidak bisa di-embed */}
       {error && (
