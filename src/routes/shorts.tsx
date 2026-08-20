@@ -106,17 +106,30 @@ function ShortCard({
             </div>
           </div>
         ) : (
-          /* Custom player — autoplay mute (diizinkan di HP), ketuk untuk suara */
+          /* Custom player — autoplay normal (suara menyala) */
           <YoutubePlayer
             videoId={id}
             autoPlay
-            startMuted
             controls="none"
             onReady={(p) => {
               apiRef.current = p;
               if (active) p.playVideo();
             }}
+            onEnded={onNext}
             className="absolute inset-0"
+          />
+        )}
+
+        {/* Tap untuk play/jeda (fallback saat autoplay diblokir browser) */}
+        {playing && (
+          <div
+            className="absolute inset-0 z-10 cursor-pointer"
+            onClick={() => {
+              const p = apiRef.current;
+              if (!p) return;
+              if (p.getPlayerState() === 1) p.pauseVideo();
+              else p.playVideo();
+            }}
           />
         )}
 
@@ -195,16 +208,6 @@ function ShortCard({
               <span className="text-[10px]">YT</span>
             </a>
           </div>
-        )}
-
-        {/* Close player button */}
-        {playing && (
-          <button
-            onClick={() => setPlaying(false)}
-            className="absolute top-3 right-3 z-20 h-8 w-8 rounded-full bg-black/60 backdrop-blur grid place-items-center text-white text-sm"
-          >
-            ✕
-          </button>
         )}
       </div>
     </div>

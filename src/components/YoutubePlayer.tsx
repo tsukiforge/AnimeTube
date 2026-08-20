@@ -273,8 +273,8 @@ export function YoutubePlayer({
         </div>
       )}
 
-      {/* Bisu — tampilkan tombol "nyalakan suara" (penting untuk autoplay mobile) */}
-      {muted && !error && (
+      {/* Bisu — tampilkan tombol "nyalakan suara" (hanya di mode kontrol penuh) */}
+      {muted && controls !== "none" && !error && (
         <button
           onClick={toggleMute}
           aria-label="Nyalakan suara"
