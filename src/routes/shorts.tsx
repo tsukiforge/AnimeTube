@@ -106,10 +106,11 @@ function ShortCard({
             </div>
           </div>
         ) : (
-          /* Custom player — auto-play, tanpa kontrol/logo YouTube */
+          /* Custom player — autoplay mute (diizinkan di HP), ketuk untuk suara */
           <YoutubePlayer
             videoId={id}
             autoPlay
+            startMuted
             controls="none"
             onReady={(p) => {
               apiRef.current = p;

@@ -8,6 +8,7 @@ interface YoutubePlayerProps {
   videoId: string;
   title?: string;
   autoPlay?: boolean;
+  startMuted?: boolean;
   controls?: ControlsMode;
   onEnded?: () => void;
   onReady?: (player: YT.Player) => void;
@@ -31,6 +32,7 @@ export function YoutubePlayer({
   videoId,
   title,
   autoPlay = true,
+  startMuted = false,
   controls = "full",
   onEnded,
   onReady,
@@ -90,6 +92,10 @@ export function YoutubePlayer({
             if (disposed) return;
             playerRef.current = player;
             try {
+              if (startMuted) {
+                player.mute();
+                setMuted(true);
+              }
               player.setVolume(volumeRef.current);
               player.setPlaybackRate(1);
             } catch {
@@ -197,6 +203,11 @@ export function YoutubePlayer({
   const togglePlay = () => {
     const p = playerRef.current;
     if (!p) return;
+    // Menekan play secara eksplisit = mau dengar suara → matikan mode bisu
+    if (muted) {
+      p.unMute();
+      setMuted(false);
+    }
     if (playing) p.pauseVideo();
     else p.playVideo();
   };
@@ -264,6 +275,17 @@ export function YoutubePlayer({
         <div className="pointer-events-none absolute left-2 top-2 z-20 max-w-[70%] truncate rounded bg-black/60 px-2 py-1 text-[10px] font-medium text-white/90 backdrop-blur-sm">
           {title}
         </div>
+      )}
+
+      {/* Bisu — tampilkan tombol "nyalakan suara" (penting untuk autoplay mobile) */}
+      {muted && !error && (
+        <button
+          onClick={toggleMute}
+          aria-label="Nyalakan suara"
+          className="absolute bottom-2 right-2 z-20 grid h-9 w-9 place-items-center rounded-full bg-black/50 text-white backdrop-blur-sm transition-colors hover:bg-black/70"
+        >
+          <VolumeX size={16} />
+        </button>
       )}
 
       {/* Error — video tidak bisa di-embed */}
