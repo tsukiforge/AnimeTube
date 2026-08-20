@@ -1,5 +1,6 @@
 import { Navbar } from "@/components/Navbar";
 import { Sidebar } from "@/components/Sidebar";
+import { YoutubePlayer } from "@/components/YoutubePlayer";
 import { formatViews, timeAgo } from "@/lib/format";
 import { getVideo, searchVideos } from "@/lib/youtube.functions";
 import { useSeo } from "@/lib/seo";
@@ -7,8 +8,14 @@ import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { fallback, zodValidator } from "@tanstack/zod-adapter";
 import {
-  ChevronDown, ChevronUp, ExternalLink,
-  Heart, MessageCircle, Music2, Play, Share2,
+  ChevronDown,
+  ChevronUp,
+  ExternalLink,
+  Heart,
+  MessageCircle,
+  Music2,
+  Play,
+  Share2,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { z } from "zod";
@@ -24,18 +31,31 @@ export const Route = createFileRoute("/shorts")({
 
 // Deteksi attribution musik dari tags/title (YouTube API v3 tidak expose
 // field lagu; kita pakai sinyal teks yang umum di judul/tag video anime).
-const MUSIC_KEYWORDS = /(amv|music|song|cover|ost|remix|viral|audio|mv|full\s?version|instrumental)/i;
+const MUSIC_KEYWORDS =
+  /(amv|music|song|cover|ost|remix|viral|audio|mv|full\s?version|instrumental)/i;
 function getMusicAttribution(video: any): string | null {
   const tags: string[] = video.snippet?.tags || [];
   for (const t of tags) {
     if (MUSIC_KEYWORDS.test(t)) return t.replace(/^#/, "").replace(/_/g, " ").trim();
   }
   const title: string = video.snippet?.title || "";
-  if (MUSIC_KEYWORDS.test(title)) return title.replace(/[|【】]/g, "").split(/\s{2,}/)[0]?.trim().slice(0, 60) || "Musik anime";
+  if (MUSIC_KEYWORDS.test(title))
+    return (
+      title
+        .replace(/[|【】]/g, "")
+        .split(/\s{2,}/)[0]
+        ?.trim()
+        .slice(0, 60) || "Musik anime"
+    );
   return null;
 }
 
-function ShortCard({ video, active, autoPlay, onNext }: {
+function ShortCard({
+  video,
+  active,
+  autoPlay,
+  onNext,
+}: {
   video: any;
   active: boolean;
   autoPlay?: boolean;
@@ -43,16 +63,20 @@ function ShortCard({ video, active, autoPlay, onNext }: {
 }) {
   const navigate = useNavigate();
   const id = typeof video.id === "string" ? video.id : video.id?.videoId;
-  const thumb =
-    video.snippet.thumbnails?.high?.url ||
-    video.snippet.thumbnails?.medium?.url;
+  const thumb = video.snippet.thumbnails?.high?.url || video.snippet.thumbnails?.medium?.url;
   const [playing, setPlaying] = useState(!!autoPlay);
+  const apiRef = useRef<YT.Player | null>(null);
   const ytUrl = `https://www.youtube.com/watch?v=${id}`;
   const music = getMusicAttribution(video);
 
-  // Reset playing state when card becomes inactive
+  // Auto-play saat kartu aktif (scroll), pause/berhenti saat tidak aktif
   useEffect(() => {
-    if (!active) setPlaying(false);
+    if (active) {
+      setPlaying(true);
+    } else {
+      setPlaying(false);
+      apiRef.current?.pauseVideo();
+    }
   }, [active]);
 
   const handleShare = () => {
@@ -65,20 +89,12 @@ function ShortCard({ video, active, autoPlay, onNext }: {
     <div className="relative w-full h-full flex items-center justify-center bg-black select-none">
       {/* Main content — 9:16 container */}
       <div className="relative h-full w-full max-w-[360px] mx-auto overflow-hidden">
-
         {/* Thumbnail / Player */}
         {!playing ? (
           /* Thumbnail view */
-          <div
-            className="absolute inset-0 cursor-pointer"
-            onClick={() => setPlaying(true)}
-          >
+          <div className="absolute inset-0 cursor-pointer" onClick={() => setPlaying(true)}>
             {thumb && (
-              <img
-                src={thumb}
-                alt={video.snippet.title}
-                className="h-full w-full object-cover"
-              />
+              <img src={thumb} alt={video.snippet.title} className="h-full w-full object-cover" />
             )}
             {/* Dark overlay */}
             <div className="absolute inset-0 bg-black/30" />
@@ -90,15 +106,16 @@ function ShortCard({ video, active, autoPlay, onNext }: {
             </div>
           </div>
         ) : (
-          /* YouTube embed — only when tapped (pakai nocookie + playsinline) */
-          <iframe
-            key={id}
-            src={`https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0&modestbranding=1&playsinline=1&controls=1`}
-            title={video.snippet.title}
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-            referrerPolicy="strict-origin-when-cross-origin"
-            className="absolute inset-0 h-full w-full border-0"
+          /* Custom player — auto-play, tanpa kontrol/logo YouTube */
+          <YoutubePlayer
+            videoId={id}
+            autoPlay
+            controls="none"
+            onReady={(p) => {
+              apiRef.current = p;
+              if (active) p.playVideo();
+            }}
+            className="absolute inset-0"
           />
         )}
 
@@ -158,10 +175,7 @@ function ShortCard({ video, active, autoPlay, onNext }: {
               <span className="text-[10px]">Shorts</span>
             </button>
 
-            <button
-              onClick={handleShare}
-              className="flex flex-col items-center gap-1 text-white"
-            >
+            <button onClick={handleShare} className="flex flex-col items-center gap-1 text-white">
               <div className="h-10 w-10 rounded-full bg-white/10 backdrop-blur-sm grid place-items-center">
                 <Share2 size={20} />
               </div>
@@ -203,7 +217,8 @@ function ShortsPage() {
 
   useSeo({
     title: "Anime Shorts — Video Pendek Anime Terbaik",
-    description: "Tonton anime shorts, AMV, dan edit video anime terbaik dalam format vertical seperti YouTube Shorts.",
+    description:
+      "Tonton anime shorts, AMV, dan edit video anime terbaik dalam format vertical seperti YouTube Shorts.",
     path: "/shorts",
   });
 
@@ -217,13 +232,14 @@ function ShortsPage() {
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
     queryKey: ["shorts-yt-style"],
-    queryFn: ({ pageParam }) => searchVideos({
-      q: "anime shorts amv edit",
-      videoDuration: "short",
-      order: "viewCount",
-      maxResults: 10,
-      pageToken: pageParam as string | undefined,
-    }),
+    queryFn: ({ pageParam }) =>
+      searchVideos({
+        q: "anime shorts amv edit",
+        videoDuration: "short",
+        order: "viewCount",
+        maxResults: 10,
+        pageToken: pageParam as string | undefined,
+      }),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (last: any) => last.nextPageToken ?? undefined,
     staleTime: 5 * 60 * 1000,
@@ -241,12 +257,15 @@ function ShortsPage() {
     }
   }, [activeIndex, allItems.length, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  const goTo = useCallback((idx: number) => {
-    if (idx < 0 || idx >= allItems.length) return;
-    setActiveIndex(idx);
-    const el = containerRef.current?.children[idx] as HTMLElement;
-    el?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, [allItems.length]);
+  const goTo = useCallback(
+    (idx: number) => {
+      if (idx < 0 || idx >= allItems.length) return;
+      setActiveIndex(idx);
+      const el = containerRef.current?.children[idx] as HTMLElement;
+      el?.scrollIntoView({ behavior: "smooth", block: "start" });
+    },
+    [allItems.length],
+  );
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -281,10 +300,7 @@ function ShortsPage() {
             style={{ scrollbarWidth: "none" }}
           >
             {allItems.map((video: any, i: number) => (
-              <div
-                key={video.id + i}
-                className="h-[calc(100vh-57px)] snap-start snap-always"
-              >
+              <div key={video.id + i} className="h-[calc(100vh-57px)] snap-start snap-always">
                 <ShortCard
                   video={video}
                   active={i === activeIndex}

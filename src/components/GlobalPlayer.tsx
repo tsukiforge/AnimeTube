@@ -10,6 +10,7 @@ import {
   useState,
 } from "react";
 import { toast } from "sonner";
+import { YoutubePlayer } from "@/components/YoutubePlayer";
 
 type PlayerVideo = { id: string; title: string };
 
@@ -24,6 +25,8 @@ interface GlobalPlayerContextValue {
   close: () => void;
   isSuppressed: () => boolean;
   setSuppressed: (v: boolean) => void;
+  setVideoEndedHandler: (cb: (() => void) | null) => void;
+  notifyVideoEnded: () => void;
 }
 
 const Ctx = createContext<GlobalPlayerContextValue | null>(null);
@@ -48,7 +51,16 @@ export function GlobalPlayerProvider({ children }: { children: React.ReactNode }
   const placeholderRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<PlayerVideo | null>(null);
   videoRef.current = video;
+  const onVideoEndedRef = useRef<(() => void) | null>(null);
   const navigate = useNavigate();
+
+  const setVideoEndedHandler = useCallback((cb: (() => void) | null) => {
+    onVideoEndedRef.current = cb;
+  }, []);
+
+  const notifyVideoEnded = useCallback(() => {
+    onVideoEndedRef.current?.();
+  }, []);
 
   const registerPlaceholder = useCallback((el: HTMLDivElement | null) => {
     placeholderRef.current = el;
@@ -120,6 +132,8 @@ export function GlobalPlayerProvider({ children }: { children: React.ReactNode }
       close,
       isSuppressed,
       setSuppressed,
+      setVideoEndedHandler,
+      notifyVideoEnded,
     }),
     [
       video,
@@ -132,6 +146,8 @@ export function GlobalPlayerProvider({ children }: { children: React.ReactNode }
       close,
       isSuppressed,
       setSuppressed,
+      setVideoEndedHandler,
+      notifyVideoEnded,
     ],
   );
 
@@ -144,24 +160,25 @@ export function GlobalPlayerProvider({ children }: { children: React.ReactNode }
 }
 
 function GlobalPlayer() {
-  const { video, showMini, placeholder, setShowMini, expand, close, isSuppressed, setSuppressed } =
-    useGlobalPlayer();
+  const {
+    video,
+    showMini,
+    placeholder,
+    setShowMini,
+    expand,
+    close,
+    isSuppressed,
+    setSuppressed,
+    notifyVideoEnded,
+  } = useGlobalPlayer();
   const [box, setBox] = useState({ x: 0, y: 0, w: 0, h: 0 });
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
   const dragStart = useRef({ mx: 0, my: 0, px: 0, py: 0 });
-  const [playerError, setPlayerError] = useState(false);
-  const [playerAttempt, setPlayerAttempt] = useState(0);
   const showMiniRef = useRef(false);
   showMiniRef.current = showMini;
   const videoRef = useRef<PlayerVideo | null>(null);
   videoRef.current = video;
-
-  // Reset error/attempt saat ganti video
-  useEffect(() => {
-    setPlayerError(false);
-    setPlayerAttempt(0);
-  }, [video?.id]);
 
   // Default posisi mini player: kanan bawah
   useEffect(() => {
@@ -271,11 +288,6 @@ function GlobalPlayer() {
   if (!video) return null;
 
   const isMini = showMini || !placeholder;
-  const isHttpOrigin = /^https?:\/\//.test(window.location.origin);
-  const jsapiParam = isHttpOrigin
-    ? `&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`
-    : "&enablejsapi=1";
-  const ytWatchUrl = `https://www.youtube.com/watch?v=${video.id}`;
 
   return (
     <div
@@ -314,46 +326,14 @@ function GlobalPlayer() {
           </div>
         </div>
       )}
-      <div className="relative aspect-video bg-black">
-        <iframe
-          key={`${video.id}-${playerAttempt}`}
-          src={`https://www.youtube-nocookie.com/embed/${video.id}?autoplay=1&rel=0&modestbranding=1&iv_load_policy=3&controls=1&playsinline=1${jsapiParam}`}
-          title={video.title}
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-          allowFullScreen
-          referrerPolicy="strict-origin-when-cross-origin"
-          className="absolute inset-0 h-full w-full border-0"
-        />
-        {playerError && (
-          <div className="absolute inset-0 z-10 grid place-items-center bg-black">
-            <div className="px-4 text-center">
-              <p className="mb-1 text-sm font-semibold text-white">Video tidak dapat diputar</p>
-              <p className="mb-4 text-xs text-white/60">
-                Video ini tidak mengizinkan diputar di situs lain (embedding dinonaktifkan).
-              </p>
-              <div className="flex justify-center gap-2">
-                <a
-                  href={ytWatchUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="rounded-full bg-primary px-4 py-2 text-xs font-bold text-primary-foreground hover:opacity-90 transition-opacity"
-                >
-                  Tonton di YouTube
-                </a>
-                <button
-                  onClick={() => {
-                    setPlayerError(false);
-                    setPlayerAttempt((n) => n + 1);
-                  }}
-                  className="rounded-full border border-border bg-surface px-4 py-2 text-xs font-bold text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Coba lagi
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
+      <YoutubePlayer
+        videoId={video.id}
+        title={video.title}
+        autoPlay
+        controls={isMini ? "minimal" : "full"}
+        onEnded={notifyVideoEnded}
+        className={isMini ? "relative aspect-video w-full" : "absolute inset-0"}
+      />
     </div>
   );
 }

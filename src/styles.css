@@ -325,3 +325,19 @@
   background: linear-gradient(90deg, #e5e5e5 0%, #f2f2f2 50%, #e5e5e5 100%);
   background-size: 600px 100%;
 }
+
+/* Custom YouTube player (kontrol sendiri, bukan kontrol asli YouTube) */
+[data-yt-player] iframe {
+  position: absolute;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+  border: 0;
+}
+:fullscreen {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  background: #000;
+}

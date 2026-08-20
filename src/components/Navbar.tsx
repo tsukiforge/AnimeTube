@@ -10,10 +10,14 @@ import {
   removeSearch,
 } from "@/hooks/use-watch-history";
 import { GENRES } from "@/lib/constants";
+import { formatViews, timeAgo, type YTVideo } from "@/lib/format";
+import { trendingAnime } from "@/lib/youtube.functions";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Menu, Mic, Moon, Search, Settings, Sun, X as XIcon } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { ArrowLeft, Menu, Mic, Moon, Search, Settings, Sun, X as XIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { VideoCard } from "@/components/VideoCard";
 
 const POPULAR = [
   "anime opening 2025",
@@ -115,6 +119,14 @@ export function Navbar() {
     setQ(query);
     navigate({ to: "/search", search: { q: query } });
   };
+
+  // Rekomendasi untuk layar pencarian mobile (mode kosong)
+  const { data: recommended } = useQuery({
+    queryKey: ["search-recommended"],
+    queryFn: () => trendingAnime({ maxResults: 8 }),
+    staleTime: 10 * 60 * 1000,
+  });
+  const recommendedItems = (recommended?.items ?? []) as YTVideo[];
 
   const stopVoice = () => {
     listeningRef.current = false;
@@ -236,19 +248,8 @@ export function Navbar() {
           </Link>
         </div>
 
-        {/* Center: search bar — hidden on mobile unless toggled */}
-        <div
-          ref={wrapRef}
-          className={`${showSearch ? "flex absolute inset-x-0 top-0 h-14 bg-background px-4 z-10 items-center" : "hidden sm:flex"} flex-1 max-w-[600px] mx-auto relative`}
-        >
-          {showSearch && (
-            <button
-              onClick={() => setShowSearch(false)}
-              className="mr-3 grid h-10 w-10 place-items-center rounded-full hover:bg-surface"
-            >
-              <Menu size={20} />
-            </button>
-          )}
+        {/* Center: search bar — hidden on mobile (pakai layar pencarian penuh) */}
+        <div ref={wrapRef} className="hidden sm:flex flex-1 max-w-[600px] mx-auto relative">
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -368,6 +369,137 @@ export function Navbar() {
           </button>
         </div>
       </div>
+
+      {/* Mobile: layar pencarian penuh (seperti YouTube) — keyboard langsung terbuka */}
+      {showSearch && (
+        <div className="sm:hidden fixed inset-0 z-[160] flex flex-col bg-background">
+          <div className="flex items-center gap-1 border-b border-border px-2 py-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                setShowSearch(false);
+                setFocused(false);
+              }}
+              aria-label="Tutup pencarian"
+              className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-foreground hover:bg-surface transition-colors"
+            >
+              <ArrowLeft size={22} />
+            </button>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                submit(q);
+              }}
+              className="flex min-w-0 flex-1 items-center"
+            >
+              <input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                autoFocus
+                placeholder="Cari anime..."
+                className="yt-search min-w-0 flex-1"
+              />
+              <button
+                type="submit"
+                aria-label="Cari"
+                className="flex h-10 shrink-0 items-center justify-center rounded-r-full border border-l-0 border-border bg-surface px-4 text-foreground dark:border-[#303030] dark:bg-[#222222] transition-colors"
+              >
+                <Search size={18} />
+              </button>
+            </form>
+            <button
+              type="button"
+              aria-label="Cari dengan suara"
+              onClick={startVoice}
+              className={`ml-1 grid h-10 w-10 shrink-0 place-items-center rounded-full bg-surface text-foreground transition-colors hover:bg-muted dark:hover:bg-[#3f3f3f] ${
+                listening ? "text-primary animate-pulse" : ""
+              }`}
+            >
+              <Mic size={18} />
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto pb-8">
+            {q.trim() ? (
+              /* Saran saat mengetik */
+              <ul className="py-1">
+                {suggestions.map((s, i) => (
+                  <li key={s + i}>
+                    <button
+                      type="button"
+                      onClick={() => submit(s)}
+                      className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-foreground transition-colors hover:bg-surface"
+                    >
+                      <Search size={14} className="shrink-0 text-muted-foreground" />
+                      <span className="truncate">{s}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <>
+                {recent.length > 0 && (
+                  <section className="mt-2">
+                    <div className="flex items-center justify-between px-4 pb-1 pt-3">
+                      <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        Pencarian terakhir
+                      </span>
+                      <button
+                        type="button"
+                        onClick={clearSearchHistory}
+                        className="text-[11px] text-muted-foreground transition-colors hover:text-destructive"
+                      >
+                        Hapus semua
+                      </button>
+                    </div>
+                    <ul>
+                      {recent.slice(0, 8).map((s) => (
+                        <li key={s}>
+                          <button
+                            type="button"
+                            onClick={() => submit(s)}
+                            className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-foreground transition-colors hover:bg-surface"
+                          >
+                            <Search size={14} className="shrink-0 text-muted-foreground" />
+                            <span className="truncate">{s}</span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                )}
+
+                <section className="mt-2">
+                  <h3 className="px-4 pb-2 pt-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Populer
+                  </h3>
+                  <div className="flex flex-wrap gap-2 px-4">
+                    {POPULAR.slice(0, 8).map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => submit(s)}
+                        className="anime-pill rounded-full px-3 py-1.5 text-xs"
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </section>
+
+                <section className="mt-4 px-4">
+                  <h3 className="pb-2 text-sm font-bold text-foreground">Direkomendasikan</h3>
+                  <div className="space-y-1.5">
+                    {recommendedItems.map((it) => (
+                      <VideoCard key={it.id} video={it} variant="compact" />
+                    ))}
+                  </div>
+                </section>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </header>
   );
 }

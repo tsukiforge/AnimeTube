@@ -117,7 +117,8 @@ function VideoMain({ autoNextId }: { autoNextId: string | null }) {
   const [countdown, setCountdown] = useState<number | null>(null);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // Global player (iframe & mini player dikelola di root — lihat GlobalPlayer.tsx)
-  const { showMini, setShowMini, setVideo, registerPlaceholder } = useGlobalPlayer();
+  const { showMini, setShowMini, setVideo, registerPlaceholder, setVideoEndedHandler } =
+    useGlobalPlayer();
 
   // Beri tahu GlobalPlayer video yang sedang diputar (judul & id)
   useEffect(() => {
@@ -162,26 +163,7 @@ function VideoMain({ autoNextId }: { autoNextId: string | null }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [countdown]);
 
-  // Listen for YouTube iframe postMessage — detect video ended or player error
-  useEffect(() => {
-    const onMessage = (e: MessageEvent) => {
-      if (e.origin !== "https://www.youtube.com" && e.origin !== "https://www.youtube-nocookie.com")
-        return;
-      try {
-        const data = typeof e.data === "string" ? JSON.parse(e.data) : e.data;
-        // YT iframe API: info.playerState === 0 means ended
-        if (data?.event === "infoDelivery" && data?.info?.playerState === 0) {
-          if (autoNextId) startCountdown(autoNextId);
-        }
-      } catch {
-        // abaikan pesan non-JSON / bukan format YT iframe API
-      }
-    };
-    window.addEventListener("message", onMessage);
-    return () => window.removeEventListener("message", onMessage);
-  }, [autoNextId]);
-
-  const startCountdown = (nextId: string) => {
+  const startCountdown = useCallback((nextId: string) => {
     setCountdown(5);
     countdownRef.current = setInterval(() => {
       setCountdown((c) => {
@@ -193,7 +175,12 @@ function VideoMain({ autoNextId }: { autoNextId: string | null }) {
         return c - 1;
       });
     }, 1000);
-  };
+  }, [navigate]);
+
+  // Auto-next saat video selesai — dipanggil GlobalPlayer (player kustom)
+  useEffect(() => {
+    setVideoEndedHandler(autoNextId ? () => startCountdown(autoNextId) : null);
+  }, [autoNextId, startCountdown, setVideoEndedHandler]);
 
   const cancelCountdown = () => {
     if (countdownRef.current) clearInterval(countdownRef.current);
