@@ -326,10 +326,15 @@
   background-size: 600px 100%;
 }
 
-/* Custom YouTube player (kontrol sendiri, bukan kontrol asli YouTube) */
+/* Custom YouTube player (kontrol sendiri, bukan kontrol asli YouTube).
+   CATATAN PENTING: iframe adalah replaced element — position:absolute + inset:0
+   saja TIDAK cukup memaksanya mengisi parent. width/height 100% !important ini
+   WAJIB dipertahankan (fallback/safety net sizing), jangan dihapus. */
 [data-yt-player] iframe {
   position: absolute;
   inset: 0;
+  width: 100% !important;
+  height: 100% !important;
   border: 0;
 }
 :fullscreen {

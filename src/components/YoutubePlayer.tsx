@@ -263,11 +263,7 @@ export function YoutubePlayer({
   const progress = duration ? (current / duration) * 100 : 0;
 
   return (
-    <div
-      ref={wrapRef}
-      data-yt-player
-      className={`relative overflow-hidden bg-black ${className ?? ""}`}
-    >
+    <div ref={wrapRef} data-yt-player className={`overflow-hidden bg-black ${className ?? ""}`}>
       <div ref={containerRef} className="absolute inset-0" />
 
       {/* Chip judul kiri-atas — sekaligus menutup logo YouTube */}
