@@ -464,7 +464,7 @@ function Related({ onFirstVideo }: { onFirstVideo?: (id: string) => void }) {
     enabled: !!v,
   });
   const q = videoData?.item?.snippet?.title?.split(" ").slice(0, 4).join(" ") || "anime";
-  const { data, isLoading, isFetchingNextPage, hasNextPage, fetchNextPage } = useInfiniteQuery({
+  const { data, isLoading, isError, isFetchingNextPage, hasNextPage, fetchNextPage, refetch } = useInfiniteQuery({
     queryKey: ["related", v, q],
     queryFn: ({ pageParam }) => getRelated(q, v, pageParam as string | undefined),
     initialPageParam: undefined as string | undefined,
@@ -496,7 +496,18 @@ function Related({ onFirstVideo }: { onFirstVideo?: (id: string) => void }) {
       <div className="space-y-2">
         {isLoading
           ? Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} compact />)
-          : items.map((v: any) => <VideoCard key={v.id} video={v} variant="compact" />)}
+          : isError ? (
+            <div className="rounded-xl border border-border bg-card p-6 text-center text-sm text-muted-foreground">
+              <p className="text-2xl mb-2">📭</p>
+              <p>Gagal memuat video terkait</p>
+              <button
+                onClick={() => refetch()}
+                className="mt-3 text-xs text-primary hover:underline"
+              >
+                Coba lagi
+              </button>
+            </div>
+          ) : items.map((v: any) => <VideoCard key={v.id} video={v} variant="compact" />)}
       </div>
       {hasNextPage && (
         <button

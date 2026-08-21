@@ -107,9 +107,13 @@ function ShortCard({
           </div>
         ) : (
           /* Custom player — autoplay normal (suara menyala) */
+          /* JANGAN hapus startMuted — autoplay video bersuara diblokir browser mobile
+              (Chrome/Safari), video jadi diam/nyangkut saat scroll ke short berikutnya.
+              User bisa tap tombol unmute (sudah ada bawaan di YoutubePlayer). */
           <YoutubePlayer
             videoId={id}
             autoPlay
+            startMuted
             controls="none"
             onReady={(p) => {
               apiRef.current = p;

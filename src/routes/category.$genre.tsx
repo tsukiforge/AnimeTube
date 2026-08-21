@@ -23,7 +23,7 @@ function CategoryPage() {
     path: `/category/${meta.slug}`,
   });
 
-  const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
+  const { data, isLoading, isError, fetchNextPage, hasNextPage, isFetchingNextPage, refetch } = useInfiniteQuery({
     queryKey: ["category-infinite", q],
     queryFn: ({ pageParam }) => searchVideos({ q, order: "viewCount", maxResults: 24, pageToken: pageParam as string | undefined }),
     initialPageParam: undefined as string | undefined,
@@ -53,7 +53,18 @@ function CategoryPage() {
             <InfiniteScroll onLoadMore={() => fetchNextPage()} hasMore={!!hasNextPage} loading={isFetchingNextPage}>
               <div className="mt-6 grid gap-x-4 gap-y-8 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {isLoading ? Array.from({ length: 8 }).map((_, i) => <SkeletonCard key={i} index={i} />)
-                  : allItems.flatMap((v: any, i: number) => {
+                  : isError ? (
+                    <div className="col-span-full rounded-xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">
+                      <p className="text-2xl mb-2">📭</p>
+                      <p>Gagal memuat video. Periksa koneksi internet Anda.</p>
+                      <button
+                        onClick={() => refetch()}
+                        className="mt-3 text-xs text-primary hover:underline"
+                      >
+                        Coba lagi
+                      </button>
+                    </div>
+                  ) : allItems.flatMap((v: any, i: number) => {
                       const card = <VideoCard key={v.id + i} video={v} />;
                       if (i > 0 && i % 8 === 0) return [card, <div key={"ad" + i} className="col-span-1"><AdSlot id={`ad-cat-${genre}-${i}`} /></div>];
                       return [card];

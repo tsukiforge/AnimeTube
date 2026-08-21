@@ -53,7 +53,7 @@ async function yt(path: string, params: Record<string, string | number | undefin
     if (res.status === 403) {
       message = "quota|403: Quota habis atau API key bermasalah";
     } else if (res.status === 429) {
-      message = "quota|429: Quota harian habis (10.000 units/hari)";
+      message = "429: Terlalu banyak permintaan — coba lagi sebentar";
     }
     throw new Error(message + ": " + JSON.stringify(data).slice(0, 200));
   }
@@ -128,12 +128,20 @@ function interleaveFeed(groups: { items: any[]; weight: number }[]): any[] {
 export async function mixedFeed(params: { q?: string; maxResults?: number; pageToken?: string } = {}) {
   const { q = "anime", maxResults = 24, pageToken } = params;
   if (!pageToken) {
-    const [short, medium, long, live] = await Promise.all([
-      searchVideos({ q, videoDuration: "short", maxResults: 8, order: "viewCount" }),
-      searchVideos({ q, videoDuration: "medium", maxResults: 10, order: "viewCount" }),
-      searchVideos({ q, videoDuration: "long", maxResults: 8, order: "viewCount" }),
-      searchVideos({ q, eventType: "live", maxResults: 4, order: "viewCount" }),
+    // Stagger requests to avoid burst rate-limit (Vercel / YouTube).
+    // 2 paralel max per batch, 200ms jeda antar batch.
+    const stagger = (fn: () => Promise<any>, delayMs: number) =>
+      new Promise<any>((resolve) => setTimeout(() => fn().then(resolve).catch(() => ({ items: [], nextPageToken: undefined })), delayMs));
+
+    const batch1 = await Promise.all([
+      stagger(() => searchVideos({ q, videoDuration: "short", maxResults: 8, order: "viewCount" }), 0),
+      stagger(() => searchVideos({ q, videoDuration: "medium", maxResults: 10, order: "viewCount" }), 200),
     ]);
+    const batch2 = await Promise.all([
+      stagger(() => searchVideos({ q, videoDuration: "long", maxResults: 8, order: "viewCount" }), 0),
+      stagger(() => searchVideos({ q, eventType: "live", maxResults: 4, order: "viewCount" }), 200),
+    ]);
+    const [short, medium, long, live] = [...batch1, ...batch2];
     return {
       items: interleaveFeed([
         { items: short.items, weight: 1.2 },
