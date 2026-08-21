@@ -15,8 +15,13 @@ const queryClient = new QueryClient({
       refetchOnWindowFocus: false,      // Tidak re-fetch saat tab di-focus — hemat quota
       refetchOnReconnect: false,        // Tidak re-fetch saat reconnect
       retry: (failureCount, error: any) => {
+        if (error?.message?.includes("429")) return failureCount < 3;
         if (error?.message?.includes("403") || error?.message?.includes("quota")) return false;
         return failureCount < 1;
+      },
+      retryDelay: (attemptIndex, error: any) => {
+        if (error?.message?.includes("429")) return Math.min(2000 * 2 ** attemptIndex, 15000);
+        return Math.min(1000 * 2 ** attemptIndex, 10000);
       },
     },
   },
